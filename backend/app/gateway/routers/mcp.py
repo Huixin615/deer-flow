@@ -281,13 +281,14 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
     "/mcp/cache/reset",
     response_model=McpCacheResetResponse,
     summary="Reset MCP Tools Cache",
-    description="Reset cached MCP tools and sessions so tools are reloaded on next use.",
+    description=("Reset cached MCP tools and pooled sessions process-wide so tools are reloaded on next use. This affects all threads and users in the current Gateway process."),
 )
 async def reset_mcp_tools_cache_endpoint(request: Request) -> McpCacheResetResponse:
-    """Reset cached MCP tools and persistent sessions.
+    """Reset cached MCP tools and persistent sessions process-wide.
 
     The next agent run or tool lookup will reload tools from the configured MCP
-    servers. This avoids relying on extensions_config.json mtime changes.
+    servers. This affects all threads and users in the current Gateway process,
+    and avoids relying on extensions_config.json mtime changes.
     """
     await _require_admin_user(request)
     reset_mcp_tools_cache()

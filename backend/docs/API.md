@@ -301,8 +301,9 @@ deployment needs additional trusted launchers.
 
 #### Reset MCP Tools Cache
 
-Clear cached MCP tools and persistent MCP sessions. Tools are loaded again from
-configured MCP servers on the next agent run or tool lookup.
+Clear cached MCP tools and persistent MCP sessions process-wide. This affects
+all threads and users in the current Gateway process. Tools are loaded again
+from configured MCP servers on the next agent run or tool lookup.
 
 ```http
 POST /api/mcp/cache/reset
