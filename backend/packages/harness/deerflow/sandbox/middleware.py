@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import replace as dc_replace
-from typing import NotRequired, override
+from typing import Annotated, NotRequired, override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
@@ -11,7 +11,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from deerflow.agents.thread_state import SandboxState, ThreadDataState
+from deerflow.agents.thread_state import SandboxState, ThreadDataState, merge_sandbox
 from deerflow.sandbox import get_sandbox_provider
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class SandboxMiddlewareState(AgentState):
     """Compatible with the `ThreadState` schema."""
 
-    sandbox: NotRequired[SandboxState | None]
+    sandbox: Annotated[NotRequired[SandboxState | None], merge_sandbox]
     thread_data: NotRequired[ThreadDataState | None]
 
 
