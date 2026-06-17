@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -4368,7 +4367,7 @@ class TestChannelService:
     # -- restart_channel config reload tests (issue #3497) --
 
     def test_restart_channel_reloads_config_from_disk(self, monkeypatch):
-        """restart_channel reads the latest config via reload_app_config()."""
+        """restart_channel reads the latest config via get_app_config()."""
         from app.channels.service import ChannelService
 
         initial_config = {"feishu": {"enabled": True, "app_id": "old_id", "app_secret": "old_secret"}}
@@ -4376,10 +4375,10 @@ class TestChannelService:
 
         service = ChannelService(channels_config=initial_config)
 
-        def mock_reload_app_config():
+        def mock_get_app_config():
             return SimpleNamespace(model_extra={"channels": updated_config})
 
-        monkeypatch.setattr("deerflow.config.app_config.reload_app_config", mock_reload_app_config)
+        monkeypatch.setattr("deerflow.config.app_config.get_app_config", mock_get_app_config)
 
         started_configs = {}
 
@@ -4398,64 +4397,6 @@ class TestChannelService:
         assert started_configs["feishu"]["app_secret"] == "new_secret"
         assert service._config["feishu"]["app_id"] == "new_id"
 
-    def test_restart_channel_force_reloads_config_when_mtime_is_unchanged(self, monkeypatch, tmp_path):
-        """restart_channel must honor explicit reload even when config mtime is stale."""
-        from app.channels.service import ChannelService
-        from deerflow.config.app_config import get_app_config, reset_app_config
-
-        config_path = tmp_path / "config.yaml"
-
-        def write_config(*, app_id: str, app_secret: str) -> None:
-            config_path.write_text(
-                f"""
-sandbox:
-  use: deerflow.sandbox.local:LocalSandboxProvider
-models:
-  - name: default
-    use: langchain_openai:ChatOpenAI
-    model: gpt-test
-channels:
-  feishu:
-    enabled: true
-    app_id: {app_id}
-    app_secret: {app_secret}
-""".lstrip(),
-                encoding="utf-8",
-            )
-
-        monkeypatch.setenv("DEER_FLOW_CONFIG_PATH", str(config_path))
-        reset_app_config()
-        try:
-            write_config(app_id="old_id", app_secret="old_secret")
-            initial_app_config = get_app_config()
-            initial_mtime = config_path.stat().st_mtime
-            assert initial_app_config.model_extra["channels"]["feishu"]["app_id"] == "old_id"
-
-            write_config(app_id="new_id", app_secret="new_secret")
-            os.utime(config_path, (initial_mtime, initial_mtime))
-            assert get_app_config().model_extra["channels"]["feishu"]["app_id"] == "old_id"
-
-            service = ChannelService(channels_config={"feishu": {"enabled": True, "app_id": "old_id", "app_secret": "old_secret"}})
-
-            started_configs = {}
-
-            async def mock_start_channel(name, config):
-                started_configs[name] = config
-                return True
-
-            service._start_channel = mock_start_channel
-
-            async def go():
-                await service.restart_channel("feishu")
-
-            _run(go())
-
-            assert started_configs["feishu"]["app_id"] == "new_id"
-            assert started_configs["feishu"]["app_secret"] == "new_secret"
-            assert service._config["feishu"]["app_id"] == "new_id"
-        finally:
-            reset_app_config()
-
     def test_configure_channel_keeps_explicit_config_over_stale_file_entry(self, monkeypatch):
         """UI-entered runtime credentials must not be clobbered by a config.yaml reload.
 
@@ -4466,10 +4407,10 @@ channels:
         """
         from app.channels.service import ChannelService
 
-        def fail_reload_app_config():
+        def fail_get_app_config():
             raise AssertionError("configure_channel must not reload file config")
 
-        monkeypatch.setattr("deerflow.config.app_config.reload_app_config", fail_reload_app_config)
+        monkeypatch.setattr("deerflow.config.app_config.get_app_config", fail_get_app_config)
 
         service = ChannelService(channels_config={})
         service._running = True
@@ -4506,13 +4447,13 @@ channels:
             {"enabled": True, "bot_token": "store-token"},
         )
 
-        def mock_reload_app_config():
+        def mock_get_app_config():
             return SimpleNamespace(
                 model_extra={"channels": {}},
                 channel_connections=ChannelConnectionsConfig.model_validate({"enabled": True, "telegram": {"enabled": True, "bot_username": "deerflow_bot"}}),
             )
 
-        monkeypatch.setattr("deerflow.config.app_config.reload_app_config", mock_reload_app_config)
+        monkeypatch.setattr("deerflow.config.app_config.get_app_config", mock_get_app_config)
 
         service = ChannelService(channels_config={})
 
@@ -4532,7 +4473,7 @@ channels:
         assert started_configs["telegram"]["bot_token"] == "store-token"
 
     def test_restart_channel_falls_back_to_cached_config_on_error(self, monkeypatch):
-        """When reload_app_config() fails, restart_channel uses cached config."""
+        """When get_app_config() fails, restart_channel uses cached config."""
         from app.channels.service import ChannelService
 
         cached_config = {"feishu": {"enabled": True, "app_id": "cached_id", "app_secret": "cached_secret"}}
@@ -4541,7 +4482,7 @@ channels:
         def _raise():
             raise RuntimeError("config missing")
 
-        monkeypatch.setattr("deerflow.config.app_config.reload_app_config", _raise)
+        monkeypatch.setattr("deerflow.config.app_config.get_app_config", _raise)
 
         started_configs = {}
 
@@ -4621,10 +4562,10 @@ channels:
         # Simulate config.yaml updated to enabled: false
         disabled_config = {"feishu": {"enabled": False, "app_id": "x", "app_secret": "y"}}
 
-        def mock_reload_app_config():
+        def mock_get_app_config():
             return SimpleNamespace(model_extra={"channels": disabled_config})
 
-        monkeypatch.setattr("deerflow.config.app_config.reload_app_config", mock_reload_app_config)
+        monkeypatch.setattr("deerflow.config.app_config.get_app_config", mock_get_app_config)
 
         started = []
 

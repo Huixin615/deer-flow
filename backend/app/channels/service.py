@@ -234,18 +234,18 @@ class ChannelService:
     def _load_channel_config(self, name: str) -> dict[str, Any] | None:
         """Load the latest config for a specific channel from disk.
 
-        Uses ``reload_app_config()`` so an explicit channel restart always
-        rereads ``config.yaml`` instead of relying on mtime-based cache
-        invalidation.
+        Uses ``get_app_config()`` which detects file changes via config
+        signature, so edits to ``config.yaml`` are picked up without a process
+        restart.
         The UI runtime-config overlay applied at startup is re-applied here
         so a file-driven reload neither drops credentials entered from the
         browser nor resurrects a channel disconnected from it.
         Falls back to the cached ``self._config`` when config loading fails.
         """
         try:
-            from deerflow.config.app_config import reload_app_config
+            from deerflow.config.app_config import get_app_config
 
-            app_config = reload_app_config()
+            app_config = get_app_config()
             extra = app_config.model_extra or {}
             channels_config = dict(extra.get("channels") or {})
             _merge_channel_connection_runtime_config(channels_config, app_config)
