@@ -11,7 +11,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from deerflow.agents.thread_state import merge_sandbox
+from deerflow.agents.thread_state import ThreadState
 from deerflow.sandbox.middleware import SandboxMiddleware, SandboxMiddlewareState
 from deerflow.sandbox.sandbox import Sandbox
 from deerflow.sandbox.sandbox_provider import SandboxProvider, reset_sandbox_provider, set_sandbox_provider
@@ -92,11 +92,12 @@ class _AsyncOnlyProvider(SandboxProvider):
         return None
 
 
-def test_sandbox_middleware_state_preserves_sandbox_reducer() -> None:
-    """Middleware-local schema must keep ThreadState.sandbox merge semantics."""
-    hints = get_type_hints(SandboxMiddlewareState, include_extras=True)
+def test_sandbox_middleware_state_matches_thread_state_sandbox_field() -> None:
+    """Middleware-local schema must not drift from ThreadState.sandbox."""
+    middleware_hints = get_type_hints(SandboxMiddlewareState, include_extras=True)
+    thread_hints = get_type_hints(ThreadState, include_extras=True)
 
-    assert merge_sandbox in hints["sandbox"].__metadata__
+    assert middleware_hints["sandbox"] == thread_hints["sandbox"]
 
 
 @pytest.mark.anyio
