@@ -71,7 +71,11 @@ def provider(isolated_paths, tmp_path):
 
 def test_acquire_with_thread_id_returns_per_thread_id(provider):
     sandbox_id = provider.acquire("alpha", user_id="default")
-    assert sandbox_id == "local:alpha"
+    assert sandbox_id == "local:default:alpha"
+
+
+def test_acquire_with_thread_id_uses_uniform_user_scoped_id(provider):
+    assert provider.acquire("alpha", user_id="alice") == "local:alice:alpha"
 
 
 def test_acquire_without_thread_id_remains_legacy_local_id(provider):
@@ -218,7 +222,7 @@ def test_get_returns_cached_instance_for_known_id(provider):
 
 
 def test_get_unknown_id_returns_none(provider):
-    assert provider.get("local:nonexistent") is None
+    assert provider.get("local:default:nonexistent") is None
 
 
 def test_release_is_noop_keeps_instance_available(provider):
@@ -243,19 +247,19 @@ def test_reset_clears_both_generic_and_per_thread_caches(provider):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 4. is_local_sandbox detects both legacy and per-thread ids
+# 4. is_local_sandbox detects both generic and per-thread ids
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_is_local_sandbox_accepts_both_id_formats():
+def test_is_local_sandbox_accepts_generic_and_per_thread_id_formats():
     from deerflow.sandbox.tools import is_local_sandbox
 
-    legacy = SimpleNamespace(state={"sandbox": {"sandbox_id": "local"}}, context={})
-    per_thread = SimpleNamespace(state={"sandbox": {"sandbox_id": "local:alpha"}}, context={})
+    generic = SimpleNamespace(state={"sandbox": {"sandbox_id": "local"}}, context={})
+    per_thread = SimpleNamespace(state={"sandbox": {"sandbox_id": "local:default:alpha"}}, context={})
     foreign = SimpleNamespace(state={"sandbox": {"sandbox_id": "aio-12345"}}, context={})
     unset = SimpleNamespace(state={}, context={})
 
-    assert is_local_sandbox(legacy) is True
+    assert is_local_sandbox(generic) is True
     assert is_local_sandbox(per_thread) is True
     assert is_local_sandbox(foreign) is False
     assert is_local_sandbox(unset) is False
@@ -330,7 +334,7 @@ def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider)
     for t in threads:
         t.join()
 
-    assert set(sids.values()) == {f"local:t{i}" for i in range(6)}
+    assert set(sids.values()) == {f"local:default:t{i}" for i in range(6)}
     assert set(provider._thread_sandboxes.keys()) == {("default", f"t{i}") for i in range(6)}
 
 
@@ -355,8 +359,8 @@ def test_thread_sandbox_cache_is_bounded(isolated_paths, tmp_path):
 
     # Only the 3 most-recent thread_ids should be retained.
     assert set(provider._thread_sandboxes.keys()) == {("default", "t2"), ("default", "t3"), ("default", "t4")}
-    assert provider.get("local:t0") is None
-    assert provider.get("local:t4") is not None
+    assert provider.get("local:default:t0") is None
+    assert provider.get("local:default:t4") is not None
 
 
 def test_lru_promotes_recently_used_thread(isolated_paths, tmp_path):
@@ -372,7 +376,7 @@ def test_lru_promotes_recently_used_thread(isolated_paths, tmp_path):
     for name in ["a", "b", "c"]:
         provider.acquire(name, user_id="default")
     # Touch "a" via ``get`` so it becomes most-recently used.
-    provider.get("local:a")
+    provider.get("local:default:a")
     # Adding a fourth thread should evict "b" (the new LRU), not "a".
     provider.acquire("d", user_id="default")
 

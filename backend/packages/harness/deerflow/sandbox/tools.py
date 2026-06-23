@@ -1112,9 +1112,9 @@ def get_thread_data(runtime: Runtime | None) -> ThreadDataState | None:
 def is_local_sandbox(runtime: Runtime | None) -> bool:
     """Check if the current sandbox is a local sandbox.
 
-    Accepts both the legacy generic id ``"local"`` (acquire with no thread
-    context) and the per-thread id format ``"local:{thread_id}"`` produced by
-    :meth:`LocalSandboxProvider.acquire` once a thread is known.
+    Accepts both the generic id ``"local"`` (acquire with no thread context)
+    and the per-thread id format ``"local:{user_id}:{thread_id}"`` produced
+    by :meth:`LocalSandboxProvider.acquire` once a thread is known.
     """
     if runtime is None:
         return False

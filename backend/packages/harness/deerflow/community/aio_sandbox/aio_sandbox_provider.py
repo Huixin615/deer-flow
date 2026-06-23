@@ -607,7 +607,7 @@ class AioSandboxProvider(SandboxProvider):
         checked. This prevents a stale health-check result from deleting a
         freshly recreated sandbox with the same deterministic id.
         """
-        thread_ids_to_remove: list[str] = []
+        thread_keys_to_remove: list[tuple[str, str]] = []
 
         with self._lock:
             active_info = self._sandbox_infos.get(sandbox_id)
@@ -618,9 +618,9 @@ class AioSandboxProvider(SandboxProvider):
 
             sandbox = self._sandboxes.pop(sandbox_id, None)
             info = self._sandbox_infos.pop(sandbox_id, None)
-            thread_ids_to_remove = [tid for tid, sid in self._thread_sandboxes.items() if sid == sandbox_id]
-            for tid in thread_ids_to_remove:
-                del self._thread_sandboxes[tid]
+            thread_keys_to_remove = [key for key, sid in self._thread_sandboxes.items() if sid == sandbox_id]
+            for key in thread_keys_to_remove:
+                del self._thread_sandboxes[key]
             self._last_activity.pop(sandbox_id, None)
             if info is None and sandbox_id in self._warm_pool:
                 info, _ = self._warm_pool.pop(sandbox_id)
@@ -927,14 +927,14 @@ class AioSandboxProvider(SandboxProvider):
         """
         info = None
         sandbox = None
-        thread_ids_to_remove: list[str] = []
+        thread_keys_to_remove: list[tuple[str, str]] = []
 
         with self._lock:
             sandbox = self._sandboxes.pop(sandbox_id, None)
             info = self._sandbox_infos.pop(sandbox_id, None)
-            thread_ids_to_remove = [tid for tid, sid in self._thread_sandboxes.items() if sid == sandbox_id]
-            for tid in thread_ids_to_remove:
-                del self._thread_sandboxes[tid]
+            thread_keys_to_remove = [key for key, sid in self._thread_sandboxes.items() if sid == sandbox_id]
+            for key in thread_keys_to_remove:
+                del self._thread_sandboxes[key]
             self._last_activity.pop(sandbox_id, None)
             # Park in warm pool — container keeps running
             if info and sandbox_id not in self._warm_pool:

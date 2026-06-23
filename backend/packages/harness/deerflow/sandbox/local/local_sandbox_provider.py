@@ -196,8 +196,6 @@ class LocalSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _sandbox_id_for_thread(thread_id: str, user_id: str) -> str:
-        if user_id == "default":
-            return f"local:{thread_id}"
         return f"local:{user_id}:{thread_id}"
 
     @staticmethod
@@ -205,13 +203,10 @@ class LocalSandboxProvider(SandboxProvider):
         if not sandbox_id.startswith("local:"):
             return None
         value = sandbox_id[len("local:") :]
-        if ":" in value:
-            user_id, thread_id = value.split(":", 1)
-            if user_id and thread_id:
-                return (user_id, thread_id)
-        if value:
-            return ("default", value)
-        return None
+        user_id, separator, thread_id = value.partition(":")
+        if not separator or not user_id or not thread_id:
+            return None
+        return (user_id, thread_id)
 
     @staticmethod
     def _build_thread_path_mappings(thread_id: str, *, user_id: str | None = None) -> list[PathMapping]:
