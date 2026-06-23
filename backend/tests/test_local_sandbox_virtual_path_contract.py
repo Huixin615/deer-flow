@@ -70,7 +70,7 @@ def provider(isolated_paths, tmp_path):
 
 
 def test_acquire_with_thread_id_returns_per_thread_id(provider):
-    sandbox_id = provider.acquire("alpha")
+    sandbox_id = provider.acquire("alpha", user_id="default")
     assert sandbox_id == "local:alpha"
 
 
@@ -180,6 +180,21 @@ def test_per_thread_user_data_mapping_isolated(provider, isolated_paths):
         sbx_b.read_file("/mnt/user-data/workspace/secret.txt")
 
 
+def test_same_thread_different_users_are_isolated(provider):
+    """Channel/user-scoped mounts must not reuse another user's local mapping."""
+    sid_alice = provider.acquire("alpha", user_id="alice")
+    sid_bob = provider.acquire("alpha", user_id="bob")
+    assert sid_alice != sid_bob
+
+    sbx_alice = provider.get(sid_alice)
+    sbx_bob = provider.get(sid_bob)
+    assert sbx_alice is not sbx_bob
+
+    sbx_alice.write_file("/mnt/user-data/outputs/report.md", "alice-only")
+    with pytest.raises(FileNotFoundError):
+        sbx_bob.read_file("/mnt/user-data/outputs/report.md")
+
+
 def test_agent_written_paths_per_thread_isolation(provider):
     """``_agent_written_paths`` tracks files this sandbox wrote so reverse-resolve
     runs on read. The set must not leak across threads."""
@@ -277,7 +292,7 @@ def test_concurrent_acquire_same_thread_yields_single_instance(provider):
 
     def racer():
         barrier.wait()
-        sid = provider.acquire("alpha")
+        sid = provider.acquire("alpha", user_id="default")
         with results_lock:
             results.append(sid)
 
@@ -292,7 +307,7 @@ def test_concurrent_acquire_same_thread_yields_single_instance(provider):
     assert len(set(results)) == 1, f"Racers saw different ids: {results}"
     # …and the cache must hold exactly one instance for ``alpha``.
     assert len(provider._thread_sandboxes) == 1
-    assert "alpha" in provider._thread_sandboxes
+    assert ("default", "alpha") in provider._thread_sandboxes
 
 
 def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider):
@@ -305,7 +320,7 @@ def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider)
 
     def racer(name: str):
         barrier.wait()
-        sid = provider.acquire(name)
+        sid = provider.acquire(name, user_id="default")
         with lock:
             sids[name] = sid
 
@@ -316,7 +331,7 @@ def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider)
         t.join()
 
     assert set(sids.values()) == {f"local:t{i}" for i in range(6)}
-    assert set(provider._thread_sandboxes.keys()) == {f"t{i}" for i in range(6)}
+    assert set(provider._thread_sandboxes.keys()) == {("default", f"t{i}") for i in range(6)}
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -336,10 +351,10 @@ def test_thread_sandbox_cache_is_bounded(isolated_paths, tmp_path):
         provider = LocalSandboxProvider(max_cached_threads=3)
 
     for i in range(5):
-        provider.acquire(f"t{i}")
+        provider.acquire(f"t{i}", user_id="default")
 
     # Only the 3 most-recent thread_ids should be retained.
-    assert set(provider._thread_sandboxes.keys()) == {"t2", "t3", "t4"}
+    assert set(provider._thread_sandboxes.keys()) == {("default", "t2"), ("default", "t3"), ("default", "t4")}
     assert provider.get("local:t0") is None
     assert provider.get("local:t4") is not None
 
@@ -355,12 +370,12 @@ def test_lru_promotes_recently_used_thread(isolated_paths, tmp_path):
         provider = LocalSandboxProvider(max_cached_threads=3)
 
     for name in ["a", "b", "c"]:
-        provider.acquire(name)
+        provider.acquire(name, user_id="default")
     # Touch "a" via ``get`` so it becomes most-recently used.
     provider.get("local:a")
     # Adding a fourth thread should evict "b" (the new LRU), not "a".
-    provider.acquire("d")
+    provider.acquire("d", user_id="default")
 
-    assert "a" in provider._thread_sandboxes
-    assert "b" not in provider._thread_sandboxes
-    assert {"a", "c", "d"} == set(provider._thread_sandboxes.keys())
+    assert ("default", "a") in provider._thread_sandboxes
+    assert ("default", "b") not in provider._thread_sandboxes
+    assert {("default", "a"), ("default", "c"), ("default", "d")} == set(provider._thread_sandboxes.keys())
