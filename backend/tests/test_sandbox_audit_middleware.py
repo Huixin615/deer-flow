@@ -183,19 +183,12 @@ class TestClassifyCommand:
     def test_safe_classified_as_pass(self, cmd):
         assert _classify_command(cmd) == "pass", f"Expected 'pass' for: {cmd!r}"
 
-    def test_benign_heredoc_classified_as_pass(self):
-        cmd = """python3 << 'PYEOF'
-from PIL import Image
-img = Image.open('/mnt/user-data/uploads/image.jpg')
-print(img.size)
-PYEOF"""
+    def test_unparseable_heredoc_classified_as_pass(self):
+        cmd = "python3 << 'EOF'\necho it's fine\nEOF"
         assert _classify_command(cmd) == "pass"
 
-    def test_heredoc_with_high_risk_pattern_still_blocks(self):
-        cmd = """python3 << 'PYEOF'
-print('inspect first')
-PYEOF
-cat /etc/shadow"""
+    def test_unparseable_heredoc_with_high_risk_pattern_still_blocks(self):
+        cmd = "python3 << 'EOF'\necho it's fine\ncat /etc/shadow\nEOF"
         assert _classify_command(cmd) == "block"
 
     # --- Compound commands: sub-command splitting ---
