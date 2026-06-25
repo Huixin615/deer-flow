@@ -225,6 +225,8 @@ export function InputBox({
 
   const [followups, setFollowups] = useState<string[]>([]);
   const { data: suggestionsConfig } = useSuggestionsConfig();
+  const suggestionsConfigLoaded = suggestionsConfig !== undefined;
+  const suggestionsEnabled = suggestionsConfig?.enabled;
   const [followupsHidden, setFollowupsHidden] = useState(false);
   const [followupsLoading, setFollowupsLoading] = useState(false);
   const [textareaFocused, setTextareaFocused] = useState(false);
@@ -687,7 +689,7 @@ export function InputBox({
     if (!lastAiId || lastAiId === lastGeneratedForAiIdRef.current) {
       return;
     }
-    if (suggestionsConfig === undefined) {
+    if (!suggestionsConfigLoaded) {
       return;
     }
     lastGeneratedForAiIdRef.current = lastAiId;
@@ -707,7 +709,7 @@ export function InputBox({
       return;
     }
 
-    if (!suggestionsConfig?.enabled) {
+    if (!suggestionsEnabled) {
       setFollowups([]);
       return;
     }
@@ -753,8 +755,9 @@ export function InputBox({
     disabled,
     isMock,
     status,
+    suggestionsConfigLoaded,
+    suggestionsEnabled,
     threadId,
-    suggestionsConfig?.enabled,
   ]);
 
   return (
