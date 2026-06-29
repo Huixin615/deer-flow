@@ -94,8 +94,10 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         if state.get("title"):
             return False
 
-        # Check if this is the first turn (has at least one user message and one assistant response)
-        messages = state.get("messages", [])
+        # Check if this is the first turn (has at least one user message and one assistant response).
+        # Defensively coerce a None ``messages`` channel (possible when reading a
+        # partially-initialized checkpoint) into an empty list so ``len()`` is safe.
+        messages = state.get("messages") or []
         min_messages = 1 if allow_partial_exchange else 2
         if len(messages) < min_messages:
             return False
@@ -116,7 +118,7 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         Returns (prompt_string, user_msg) so callers can use user_msg as fallback.
         """
         config = self._get_title_config()
-        messages = state.get("messages", [])
+        messages = state.get("messages") or []
 
         user_msg_content = next((self._message_content(m) for m in messages if self._is_user_message_for_title(m)), "")
         assistant_msg_content = next((self._message_content(m) for m in messages if self._message_type(m) == "ai"), "")

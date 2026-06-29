@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, call
 
 import pytest
@@ -13,6 +14,7 @@ from deerflow.runtime.runs.worker import (
     RunContext,
     _agent_factory_supports_app_config,
     _build_runtime_context,
+    _bump_channel_version,
     _ensure_interrupted_title,
     _extract_llm_error_fallback_message,
     _install_runtime_context,
@@ -875,3 +877,350 @@ async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer
     assert tup is not None
     persisted = tup.checkpoint.get("channel_values", {}).get("title")
     assert persisted == title
+
+
+# ---------------------------------------------------------------------------
+# _bump_channel_version — invariant: the returned version MUST differ from
+# the prior value, no matter the checkpointer's versioning scheme.
+# ---------------------------------------------------------------------------
+
+
+class _CheckpointerWithoutGetNextVersion:
+    """A checkpointer that lacks ``get_next_version`` — exercises the fallback path."""
+
+
+class _CheckpointerWithIntVersion:
+    """A checkpointer whose ``get_next_version`` increments integers (default LangGraph behavior)."""
+
+    @staticmethod
+    def get_next_version(current, _channel):
+        return (current or 0) + 1
+
+
+class _CheckpointerWithFloatVersion:
+    """A checkpointer whose ``get_next_version`` increments floats (some custom savers)."""
+
+    @staticmethod
+    def get_next_version(current, _channel):
+        return (current or 0.0) + 1.0
+
+
+class _CheckpointerWithBrokenGetNextVersion:
+    """A checkpointer whose ``get_next_version`` raises — must fall back, not propagate."""
+
+    @staticmethod
+    def get_next_version(current, _channel):
+        raise RuntimeError("simulated saver bug")
+
+
+class _CheckpointerWithStuckGetNextVersion:
+    """``get_next_version`` returns the same value — must fall back so the bump still differs."""
+
+    @staticmethod
+    def get_next_version(current, _channel):
+        return current
+
+
+def test_bump_channel_version_uses_checkpointer_get_next_version_when_available():
+    """If the saver exposes ``get_next_version``, that result is preferred."""
+    assert _bump_channel_version(_CheckpointerWithIntVersion(), 5) == 6
+    assert _bump_channel_version(_CheckpointerWithFloatVersion(), 2.5) == 3.5
+
+
+def test_bump_channel_version_falls_back_on_broken_get_next_version():
+    """A raising ``get_next_version`` must not propagate; the defensive path bumps from prior."""
+    bumped = _bump_channel_version(_CheckpointerWithBrokenGetNextVersion(), 7)
+    assert bumped != 7
+    assert bumped == 8
+
+
+def test_bump_channel_version_falls_back_on_stuck_get_next_version():
+    """If ``get_next_version`` returns the same value, the defensive path still yields a strict bump."""
+    bumped = _bump_channel_version(_CheckpointerWithStuckGetNextVersion(), 4)
+    assert bumped != 4
+    assert bumped == 5
+
+
+def test_bump_channel_version_handles_missing_get_next_version_and_int_seed():
+    """No ``get_next_version`` available; integer seed gets incremented."""
+    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), 11) == 12
+
+
+def test_bump_channel_version_handles_missing_get_next_version_and_none_seed():
+    """No prior version → seed to 1 (matches LangGraph's int-default scheme)."""
+    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), None) == 1
+
+
+def test_bump_channel_version_handles_float_seed_without_get_next_version():
+    """Float seed without ``get_next_version`` increments as float — preserves the saver's scheme."""
+    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), 2.5)
+    assert isinstance(bumped, float)
+    assert bumped > 2.5
+
+
+def test_bump_channel_version_handles_numeric_string_seed():
+    """Numeric string seed bumps to the next numeric string (some legacy serializations)."""
+    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), "3") == "4"
+
+
+def test_bump_channel_version_handles_uuid_shaped_string_seed():
+    """Non-numeric string (e.g. UUID-shaped) bumps via ``.<n>`` suffix so the value is strictly different."""
+    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), "abc-uuid")
+    assert bumped != "abc-uuid"
+    assert bumped == "abc-uuid.1"
+
+
+def test_bump_channel_version_handles_bool_seed():
+    """``bool`` is technically an ``int``; coerce so the next value is a plain int."""
+    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), True)
+    assert bumped == 2
+    assert isinstance(bumped, int)
+
+
+# ---------------------------------------------------------------------------
+# _ensure_interrupted_title — additional defensive boundaries
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_returns_none_when_title_disabled(monkeypatch):
+    """When ``title.enabled=False`` in config, the helper must not write a new checkpoint."""
+    from deerflow.config.title_config import TitleConfig
+
+    initial_checkpoint = {
+        "id": "ckpt-1",
+        "channel_values": {"messages": [{"type": "human", "content": "hi"}]},
+        "channel_versions": {"messages": 1},
+    }
+    checkpointer = _TitleCheckpointer(
+        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
+    )
+    app_config = SimpleNamespace(title=TitleConfig(enabled=False, max_chars=40, max_words=20))
+
+    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=app_config) is None
+    checkpointer.aput.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_returns_none_with_no_user_message(monkeypatch):
+    """A checkpoint with neither messages nor a derivable title produces no write."""
+    from deerflow.config.title_config import TitleConfig
+
+    initial_checkpoint = {
+        "id": "ckpt-1",
+        "channel_values": {"messages": []},
+        "channel_versions": {},
+    }
+    checkpointer = _TitleCheckpointer(
+        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
+    )
+    app_config = SimpleNamespace(title=TitleConfig(enabled=True, max_chars=40, max_words=20))
+
+    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=app_config) is None
+    checkpointer.aput.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_handles_none_messages_channel(monkeypatch):
+    """A partially-initialized checkpoint with ``messages=None`` must not crash."""
+    from deerflow.config.title_config import TitleConfig
+
+    initial_checkpoint = {
+        "id": "ckpt-1",
+        "channel_values": {"messages": None},
+        "channel_versions": {},
+    }
+    checkpointer = _TitleCheckpointer(
+        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
+    )
+    app_config = SimpleNamespace(title=TitleConfig(enabled=True, max_chars=40, max_words=20))
+
+    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=app_config) is None
+    checkpointer.aput.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_propagates_aput_error_to_caller(monkeypatch):
+    """Exceptions from ``aput`` propagate — the caller (worker.run_agent finally block) is responsible for swallowing them.
+
+    This test pins the contract: the helper itself does NOT silently eat saver errors,
+    so a structural saver regression remains visible in the logs at the call site.
+    """
+    from deerflow.agents.middlewares.title_middleware import TitleMiddleware
+
+    monkeypatch.setattr(
+        TitleMiddleware,
+        "_generate_title_result",
+        lambda self, state, allow_partial_exchange=False: {"title": "Generated"},
+    )
+
+    initial_checkpoint = {
+        "id": "ckpt-1",
+        "channel_values": {"messages": [{"type": "human", "content": "hi"}]},
+        "channel_versions": {"messages": 1},
+    }
+    checkpointer = _TitleCheckpointer(
+        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
+    )
+    checkpointer.aput.side_effect = RuntimeError("simulated DB write failure")
+
+    with pytest.raises(RuntimeError, match="simulated DB write failure"):
+        await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=None)
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_idempotent_across_repeated_calls(monkeypatch):
+    """Second invocation against the now-titled checkpoint must not re-write.
+
+    Regression anchor for the case where a brittle helper might re-trigger
+    on subsequent finally-hook runs (e.g. retries) and rewrite the title.
+    """
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from deerflow.agents.middlewares.title_middleware import TitleMiddleware
+
+    monkeypatch.setattr(
+        TitleMiddleware,
+        "_generate_title_result",
+        lambda self, state, allow_partial_exchange=False: {"title": "First Title"},
+    )
+
+    checkpointer = InMemorySaver()
+    cfg = {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
+    ck = empty_checkpoint()
+    ck["channel_values"] = {"messages": [{"type": "human", "content": "hi"}]}
+    ck["channel_versions"] = {"messages": 1}
+    await checkpointer.aput(cfg, ck, {"source": "loop", "step": 1, "writes": {}}, {"messages": 1})
+
+    first = await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=None)
+    assert first == "First Title"
+
+    # Second call: title is now present, so the helper short-circuits without
+    # rewriting — even if the middleware were to suggest a different title.
+    monkeypatch.setattr(
+        TitleMiddleware,
+        "_generate_title_result",
+        lambda self, state, allow_partial_exchange=False: {"title": "Different Title"},
+    )
+    second = await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=None)
+    assert second == "First Title"
+
+    tup = await checkpointer.aget_tuple(cfg)
+    assert tup.checkpoint["channel_values"]["title"] == "First Title"
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_preserves_non_title_channel_versions(monkeypatch):
+    """Bumping ``channel_versions["title"]`` must not modify other channels' versions.
+
+    Regression anchor: an earlier draft built ``new_versions`` from
+    ``dict(channel_versions)`` and would have erroneously declared every
+    channel as "needs new blob" on DB savers.
+    """
+    from deerflow.agents.middlewares.title_middleware import TitleMiddleware
+
+    monkeypatch.setattr(
+        TitleMiddleware,
+        "_generate_title_result",
+        lambda self, state, allow_partial_exchange=False: {"title": "Generated"},
+    )
+
+    initial_checkpoint = {
+        "id": "ckpt-1",
+        "channel_values": {
+            "messages": [{"type": "human", "content": "hi"}],
+            "artifacts": [],
+            "todos": None,
+        },
+        "channel_versions": {"messages": 5, "artifacts": 3, "todos": 1},
+    }
+    checkpointer = _TitleCheckpointer(
+        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
+    )
+
+    await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=None)
+
+    _, written_checkpoint, _, new_versions = checkpointer.aput.await_args.args
+    # Only the title channel is declared in new_versions.
+    assert set(new_versions.keys()) == {"title"}
+    # Other channel versions are preserved verbatim on the written checkpoint.
+    assert written_checkpoint["channel_versions"]["messages"] == 5
+    assert written_checkpoint["channel_versions"]["artifacts"] == 3
+    assert written_checkpoint["channel_versions"]["todos"] == 1
+
+
+@pytest.mark.anyio
+async def test_worker_finally_block_swallows_helper_exceptions(monkeypatch):
+    """The worker's interrupted-title hook must remain non-fatal — any exception
+    from the helper (DB saver bug, middleware bug, etc.) must not propagate past
+    the run boundary or prevent the subsequent threads_meta sync block from
+    running. This pins the integration of helper + finally try/except, not just
+    the helper itself.
+    """
+    import deerflow.runtime.runs.worker as worker_module
+
+    async def _boom(*_args, **_kwargs):
+        raise RuntimeError("forced helper failure")
+
+    monkeypatch.setattr(worker_module, "_ensure_interrupted_title", _boom)
+
+    run_manager = RunManager()
+    record = await run_manager.create("thread-1")
+    record.status = RunStatus.interrupted
+
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+
+    class _MinimalCheckpointer:
+        async def aget_tuple(self, config):
+            return None
+
+        async def aput(self, *args, **kwargs):
+            return {}
+
+    captured_status: dict[str, Any] = {}
+
+    class _ThreadStore:
+        async def update_display_name(self, thread_id, title):
+            captured_status["display_name"] = (thread_id, title)
+
+        async def update_status(self, thread_id, status):
+            captured_status["status"] = (thread_id, status)
+
+    class _AbortingAgent:
+        def __init__(self) -> None:
+            self.metadata = {"model_name": "fake-test-model"}
+            self.checkpointer: Any | None = None
+            self.store: Any | None = None
+            self.interrupt_before_nodes = None
+            self.interrupt_after_nodes = None
+
+        async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            # Abort immediately so the run lands in the interrupted branch.
+            record.abort_event.set()
+            if False:
+                yield  # pragma: no cover — make this an async generator
+            return
+
+    def factory(*, config):
+        del config
+        return _AbortingAgent()
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(checkpointer=_MinimalCheckpointer(), thread_store=_ThreadStore()),
+        agent_factory=factory,
+        graph_input={"messages": []},
+        config={},
+    )
+
+    # The helper raised, but the run still reaches the threads_meta status sync
+    # and ``publish_end`` — i.e. the SSE stream is closed cleanly and the row
+    # reflects the run outcome.
+    assert captured_status.get("status") == ("thread-1", "interrupted")
+    bridge.publish_end.assert_awaited_once_with(record.run_id)

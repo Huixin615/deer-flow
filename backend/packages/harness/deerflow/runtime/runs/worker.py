@@ -554,8 +554,54 @@ def _new_checkpoint_marker() -> dict[str, str]:
     return {"id": marker["id"], "ts": marker["ts"]}
 
 
+def _bump_channel_version(checkpointer: Any, current_version: Any) -> Any:
+    """Return a strictly-different next version for a checkpoint channel.
+
+    DB-backed LangGraph savers (PostgresSaver / v4 SqliteSaver blob layout)
+    persist channel blobs keyed by ``channel_versions[<channel>]``, so the
+    new value MUST differ from the prior value. We delegate to the
+    checkpointer's ``get_next_version`` when available — that is the canonical
+    versioning scheme each saver picks (int, monotonic float, or
+    UUID-shaped string). When the checkpointer doesn't expose it (or it
+    returns ``None``/an unchanged value), fall back to a defensive bump that
+    still guarantees inequality.
+    """
+    get_next_version = getattr(checkpointer, "get_next_version", None)
+    if callable(get_next_version):
+        try:
+            next_version = get_next_version(current_version, None)
+        except Exception:
+            next_version = None
+        if next_version is not None and next_version != current_version:
+            return next_version
+        # fall through to defensive bump
+
+    if isinstance(current_version, bool):
+        # ``bool`` is a subclass of ``int``; treat True/False as 1/0 instead of
+        # adding to the boolean itself, which would produce an int anyway but
+        # via a path that surprises readers.
+        return int(current_version) + 1
+    if isinstance(current_version, int):
+        return current_version + 1
+    if isinstance(current_version, float):
+        # Match LangGraph's default float versioning (monotonic increment).
+        return current_version + 1.0
+    if isinstance(current_version, str):
+        try:
+            return str(int(current_version) + 1)
+        except ValueError:
+            return f"{current_version}.1"
+    return 1
+
+
 async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_config: AppConfig | None) -> str | None:
-    """Persist a local fallback title for interrupted first-turn runs."""
+    """Persist a local fallback title for interrupted first-turn runs.
+
+    Returns the title that is now persisted (existing or newly written), or
+    ``None`` when no checkpoint is available or no title text can be derived.
+    Idempotent: re-invoking against a checkpoint that already carries a title
+    short-circuits without writing a new checkpoint.
+    """
     ckpt_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     ckpt_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", ckpt_config)
     if ckpt_tuple is None:
@@ -580,23 +626,14 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
     checkpoint.update({"id": marker["id"], "ts": marker["ts"], "channel_values": channel_values})
 
     # Bump ``channel_versions["title"]`` and declare the bump in ``new_versions``
-    # so DB-backed savers (SqliteSaver/PostgresSaver) actually persist the new
-    # blob — those savers strip inline ``channel_values`` and only write blobs
-    # for channels listed in ``new_versions``. Mirrors ``_rollback_to_pre_run_checkpoint``.
+    # so DB-backed savers (SqliteSaver v4 / PostgresSaver) actually persist the
+    # new blob — those savers strip inline ``channel_values`` from ``put`` and
+    # only write blobs for channels listed in ``new_versions``. The legacy
+    # single-table sqlite saver ignores ``new_versions`` and inlines the
+    # snapshot, so this path is correct for both layouts. Mirrors
+    # ``_rollback_to_pre_run_checkpoint`` in the same file.
     channel_versions = dict(checkpoint.get("channel_versions", {}) or {})
-    get_next_version = getattr(checkpointer, "get_next_version", None)
-    current_title_version = channel_versions.get("title")
-    if callable(get_next_version):
-        next_title_version = get_next_version(current_title_version, None)
-    elif isinstance(current_title_version, int):
-        next_title_version = current_title_version + 1
-    elif isinstance(current_title_version, str):
-        try:
-            next_title_version = str(int(current_title_version) + 1)
-        except ValueError:
-            next_title_version = current_title_version + ".1"
-    else:
-        next_title_version = 1
+    next_title_version = _bump_channel_version(checkpointer, channel_versions.get("title"))
     channel_versions["title"] = next_title_version
     checkpoint["channel_versions"] = channel_versions
 
