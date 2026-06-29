@@ -579,6 +579,27 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
     marker = _new_checkpoint_marker()
     checkpoint.update({"id": marker["id"], "ts": marker["ts"], "channel_values": channel_values})
 
+    # Bump ``channel_versions["title"]`` and declare the bump in ``new_versions``
+    # so DB-backed savers (SqliteSaver/PostgresSaver) actually persist the new
+    # blob — those savers strip inline ``channel_values`` and only write blobs
+    # for channels listed in ``new_versions``. Mirrors ``_rollback_to_pre_run_checkpoint``.
+    channel_versions = dict(checkpoint.get("channel_versions", {}) or {})
+    get_next_version = getattr(checkpointer, "get_next_version", None)
+    current_title_version = channel_versions.get("title")
+    if callable(get_next_version):
+        next_title_version = get_next_version(current_title_version, None)
+    elif isinstance(current_title_version, int):
+        next_title_version = current_title_version + 1
+    elif isinstance(current_title_version, str):
+        try:
+            next_title_version = str(int(current_title_version) + 1)
+        except ValueError:
+            next_title_version = current_title_version + ".1"
+    else:
+        next_title_version = 1
+    channel_versions["title"] = next_title_version
+    checkpoint["channel_versions"] = channel_versions
+
     metadata = dict(getattr(ckpt_tuple, "metadata", {}) or {})
     metadata["source"] = "update"
     prev_step = metadata.get("step")
@@ -589,7 +610,15 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
     tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
     checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
     write_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
-    await _call_checkpointer_method(checkpointer, "aput", "put", write_config, checkpoint, metadata, {})
+    await _call_checkpointer_method(
+        checkpointer,
+        "aput",
+        "put",
+        write_config,
+        checkpoint,
+        metadata,
+        {"title": next_title_version},
+    )
     return title
 
 
