@@ -581,12 +581,13 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
 
     metadata = dict(getattr(ckpt_tuple, "metadata", {}) or {})
     metadata["source"] = "update"
-    metadata["step"] = metadata.get("step", 0) + 1
+    prev_step = metadata.get("step")
+    metadata["step"] = (prev_step + 1) if isinstance(prev_step, int) else 1
     metadata["writes"] = {"runtime_interrupt_title": {"title": title}}
 
-    ckpt_config = getattr(ckpt_tuple, "config", {}) or {}
-    ckpt_configurable = ckpt_config.get("configurable", {}) if isinstance(ckpt_config, dict) else {}
-    checkpoint_ns = ckpt_configurable.get("checkpoint_ns", "") if isinstance(ckpt_configurable, dict) else ""
+    tuple_config = getattr(ckpt_tuple, "config", {}) or {}
+    tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
+    checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
     write_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
     await _call_checkpointer_method(checkpointer, "aput", "put", write_config, checkpoint, metadata, {})
     return title

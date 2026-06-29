@@ -96,14 +96,18 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
         # Check if this is the first turn (has at least one user message and one assistant response)
         messages = state.get("messages", [])
-        if len(messages) < 2:
+        min_messages = 1 if allow_partial_exchange else 2
+        if len(messages) < min_messages:
             return False
 
         # Count user and assistant messages
         user_messages = [m for m in messages if self._is_user_message_for_title(m)]
         assistant_messages = [m for m in messages if self._message_type(m) == "ai"]
 
-        # Generate title after first complete exchange
+        # Normal path: title only after first complete exchange. Interrupted path
+        # (``allow_partial_exchange=True``) accepts a lone first-turn user message
+        # so a fallback title can still be persisted when the run is cancelled
+        # before any AI chunk reaches the checkpoint.
         return len(user_messages) == 1 and (len(assistant_messages) >= 1 or allow_partial_exchange)
 
     def _build_title_prompt(self, state: TitleMiddlewareState) -> tuple[str, str]:

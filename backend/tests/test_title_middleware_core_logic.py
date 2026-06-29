@@ -294,6 +294,49 @@ class TestTitleMiddlewareCoreLogic:
         assert "<system-reminder>" not in prompt
         assert "User prefers Python" not in prompt
 
+    def test_should_generate_title_partial_exchange_allows_user_only(self):
+        """Interrupted-run path can produce a fallback from a lone human message."""
+        _set_test_title_config(enabled=True)
+        middleware = TitleMiddleware()
+        state = {"messages": [HumanMessage(content="只有人类消息，AI 还没回复")]}
+
+        assert middleware._should_generate_title(state) is False
+        assert middleware._should_generate_title(state, allow_partial_exchange=True) is True
+
+    def test_should_generate_title_partial_exchange_skips_when_titled(self):
+        """Existing title still wins, even on the interrupted-run path."""
+        _set_test_title_config(enabled=True)
+        middleware = TitleMiddleware()
+        state = {
+            "messages": [HumanMessage(content="问题")],
+            "title": "Already set",
+        }
+        assert middleware._should_generate_title(state, allow_partial_exchange=True) is False
+
+    def test_should_generate_title_handles_dict_messages(self):
+        """Checkpoint channel_values store messages as dicts; the middleware must accept them."""
+        _set_test_title_config(enabled=True)
+        middleware = TitleMiddleware()
+        state = {
+            "messages": [
+                {"type": "human", "content": "问"},
+                {"type": "ai", "content": "答"},
+            ]
+        }
+        assert middleware._should_generate_title(state) is True
+
+    def test_sync_generate_title_from_dict_messages(self):
+        """Sync fallback path can derive title text from dict-form messages."""
+        _set_test_title_config(max_chars=20)
+        middleware = TitleMiddleware()
+        state = {
+            "messages": [
+                {"role": "user", "content": "请帮我写测试"},
+                {"role": "assistant", "content": "好的"},
+            ]
+        }
+        assert middleware._generate_title_result(state) == {"title": "请帮我写测试"}
+
     def test_generate_title_async_strips_think_tags_in_response(self, monkeypatch):
         """Async title generation strips <think> blocks from the model response."""
         _set_test_title_config(max_chars=50)
