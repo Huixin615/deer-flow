@@ -879,6 +879,161 @@ async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer
     assert persisted == title
 
 
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_links_new_checkpoint_to_its_parent(tmp_path):
+    """The title-bump checkpoint must point at the prior checkpoint as its parent.
+
+    Without this, the new checkpoint is a tree root (orphan) — it would not be
+    walkable from any future ``runs.resume_from`` / time-travel call, and it
+    would render as a sibling of the prior checkpoint (rather than its
+    descendant) in any history-visualization UI built on
+    ``BaseCheckpointSaver.alist``. Mirrors the parent-pointer threading every
+    middleware-driven write does.
+    """
+    from langchain_core.messages import HumanMessage
+    from langgraph.checkpoint.base import empty_checkpoint
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    from deerflow.config.title_config import TitleConfig
+
+    db_path = str(tmp_path / "ckpt.db")
+    thread_cfg = {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
+
+    async with AsyncSqliteSaver.from_conn_string(db_path) as writer:
+        await writer.setup()
+        ck = empty_checkpoint()
+        ck["channel_values"] = {"messages": [HumanMessage(content="Hello?").model_dump()]}
+        ck["channel_versions"] = {"messages": 1}
+        seeded = await writer.aput(thread_cfg, ck, {"source": "loop", "step": 1, "writes": {}}, {"messages": 1})
+        seeded_id = seeded["configurable"]["checkpoint_id"]
+
+    title_config = TitleConfig(enabled=True, max_chars=40, max_words=20)
+    app_config = SimpleNamespace(title=title_config)
+    async with AsyncSqliteSaver.from_conn_string(db_path) as worker_saver:
+        await _ensure_interrupted_title(checkpointer=worker_saver, thread_id="thread-1", app_config=app_config)
+
+    async with AsyncSqliteSaver.from_conn_string(db_path) as reader:
+        latest = await reader.aget_tuple(thread_cfg)
+    assert latest is not None
+    parent_config = latest.parent_config
+    assert parent_config is not None, "title-bump checkpoint must have a parent_config"
+    parent_id = parent_config.get("configurable", {}).get("checkpoint_id")
+    assert parent_id == seeded_id, f"title-bump checkpoint's parent must be the seeded checkpoint ({seeded_id!r}), got {parent_id!r}"
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_appears_in_history_with_audit_marker(tmp_path):
+    """The title-bump shows up in ``alist`` history with an identifiable writes marker.
+
+    We deliberately do NOT try to hide this checkpoint from history (it's a
+    real write and the audit trail belongs in the saver), but its metadata
+    MUST be unambiguously attributable to the runtime interrupt path so tools
+    / UI can identify and group it. Pins the audit-marker contract.
+    """
+    from langchain_core.messages import HumanMessage
+    from langgraph.checkpoint.base import empty_checkpoint
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    from deerflow.config.title_config import TitleConfig
+
+    db_path = str(tmp_path / "ckpt.db")
+    thread_cfg = {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
+
+    async with AsyncSqliteSaver.from_conn_string(db_path) as writer:
+        await writer.setup()
+        ck = empty_checkpoint()
+        ck["channel_values"] = {"messages": [HumanMessage(content="Hello?").model_dump()]}
+        ck["channel_versions"] = {"messages": 1}
+        await writer.aput(thread_cfg, ck, {"source": "loop", "step": 1, "writes": {}}, {"messages": 1})
+
+    title_config = TitleConfig(enabled=True, max_chars=40, max_words=20)
+    app_config = SimpleNamespace(title=title_config)
+    async with AsyncSqliteSaver.from_conn_string(db_path) as worker_saver:
+        await _ensure_interrupted_title(checkpointer=worker_saver, thread_id="thread-1", app_config=app_config)
+
+    async with AsyncSqliteSaver.from_conn_string(db_path) as reader:
+        history = []
+        async for tup in reader.alist(thread_cfg):
+            history.append(tup)
+
+    assert len(history) == 2, "history has the seeded checkpoint + the title-bump checkpoint"
+    # Newest first
+    bump_meta = history[0].metadata or {}
+    seeded_meta = history[1].metadata or {}
+    # Audit marker on the bump checkpoint — UIs / tools rely on this to
+    # distinguish runtime-driven writes from agent-driven loop writes.
+    assert bump_meta.get("source") == "update"
+    assert "runtime_interrupt_title" in (bump_meta.get("writes") or {})
+    # Seeded checkpoint is unchanged ("loop", no runtime marker).
+    assert seeded_meta.get("source") == "loop"
+    assert "runtime_interrupt_title" not in (seeded_meta.get("writes") or {})
+
+
+@pytest.mark.anyio
+async def test_ensure_interrupted_title_survives_immediate_next_turn(tmp_path):
+    """Cancel-then-immediately-resume: the next agent turn must preserve the fallback title.
+
+    Real-world scenario: user clicks stop, then immediately sends a follow-up.
+    The next turn's checkpoint write appends ``messages`` but does not touch
+    the ``title`` channel. The title channel's last-written value MUST be
+    preserved through the version-blob chain so that ``threads_meta`` /
+    ``GET /threads/{id}`` keep showing the fallback title (instead of
+    suddenly going back to "Untitled" because the next write blew it away).
+    """
+    from langchain_core.messages import AIMessage, HumanMessage
+    from langgraph.checkpoint.base import empty_checkpoint
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    from deerflow.config.title_config import TitleConfig
+
+    db_path = str(tmp_path / "ckpt.db")
+    thread_cfg = {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
+
+    # 1. Seed first-turn human message.
+    async with AsyncSqliteSaver.from_conn_string(db_path) as writer:
+        await writer.setup()
+        ck = empty_checkpoint()
+        ck["channel_values"] = {"messages": [HumanMessage(content="Why is the sky blue?").model_dump()]}
+        ck["channel_versions"] = {"messages": 1}
+        await writer.aput(thread_cfg, ck, {"source": "loop", "step": 1, "writes": {}}, {"messages": 1})
+
+    # 2. Worker helper writes the fallback title checkpoint.
+    title_config = TitleConfig(enabled=True, max_chars=40, max_words=20)
+    app_config = SimpleNamespace(title=title_config)
+    async with AsyncSqliteSaver.from_conn_string(db_path) as worker_saver:
+        title = await _ensure_interrupted_title(checkpointer=worker_saver, thread_id="thread-1", app_config=app_config)
+    assert title
+
+    # 3. Simulate the next agent turn appending (user, ai) without touching title.
+    async with AsyncSqliteSaver.from_conn_string(db_path) as resume:
+        tup = await resume.aget_tuple(thread_cfg)
+        assert tup.checkpoint["channel_values"].get("title") == title
+
+        ck2 = dict(tup.checkpoint)
+        cv2 = dict(ck2["channel_values"])
+        cv2["messages"] = [
+            *cv2.get("messages", []),
+            HumanMessage(content="follow-up").model_dump(),
+            AIMessage(content="follow-up reply").model_dump(),
+        ]
+        ck2["channel_values"] = cv2
+        cvs2 = dict(ck2.get("channel_versions", {}))
+        cvs2["messages"] = (cvs2.get("messages", 0) or 0) + 1
+        ck2["channel_versions"] = cvs2
+        marker = empty_checkpoint()
+        ck2["id"] = marker["id"]
+        ck2["ts"] = marker["ts"]
+        await resume.aput(tup.config, ck2, {"source": "loop", "step": 2, "writes": {}}, {"messages": cvs2["messages"]})
+
+    # 4. Verify on a fresh saver: title is preserved, message count grew.
+    async with AsyncSqliteSaver.from_conn_string(db_path) as verify:
+        after = await verify.aget_tuple(thread_cfg)
+    assert after.checkpoint["channel_values"].get("title") == title, (
+        "next-turn checkpoint must preserve the fallback title — without the channel_versions['title'] bump from _ensure_interrupted_title, the title blob would be missing from the DB and aget_tuple would reconstruct it as None"
+    )
+    assert len(after.checkpoint["channel_values"].get("messages", [])) == 3
+
+
 # ---------------------------------------------------------------------------
 # _bump_channel_version — invariant: the returned version MUST differ from
 # the prior value, no matter the checkpointer's versioning scheme.
