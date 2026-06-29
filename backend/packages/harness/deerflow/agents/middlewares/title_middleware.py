@@ -81,8 +81,17 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return getattr(message, "content", "")
 
     @staticmethod
+    def _is_dynamic_context_reminder_message(message: object) -> bool:
+        if is_dynamic_context_reminder(message):
+            return True
+        if isinstance(message, dict):
+            additional_kwargs = message.get("additional_kwargs")
+            return isinstance(additional_kwargs, dict) and bool(additional_kwargs.get("dynamic_context_reminder"))
+        return False
+
+    @staticmethod
     def _is_user_message_for_title(message: object) -> bool:
-        return TitleMiddleware._message_type(message) == "human" and not is_dynamic_context_reminder(message)
+        return TitleMiddleware._message_type(message) == "human" and not TitleMiddleware._is_dynamic_context_reminder_message(message)
 
     def _should_generate_title(self, state: TitleMiddlewareState, *, allow_partial_exchange: bool = False) -> bool:
         """Check if we should generate a title for this thread."""

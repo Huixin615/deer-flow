@@ -383,6 +383,24 @@ class TestTitleMiddlewareCoreLogic:
         result = middleware._generate_title_result(state, allow_partial_exchange=True)
         assert result == {"title": "请帮我写测试"}
 
+    def test_partial_exchange_ignores_dict_dynamic_context_reminder(self):
+        """Checkpoint dicts can include hidden memory reminders that should not count as real user turns."""
+        _set_test_title_config(enabled=True, max_chars=20)
+        middleware = TitleMiddleware()
+        state = {
+            "messages": [
+                {
+                    "type": "human",
+                    "content": "<memory>User prefers concise titles.</memory>",
+                    "additional_kwargs": {"hide_from_ui": True, _DYNAMIC_CONTEXT_REMINDER_KEY: True},
+                },
+                {"type": "human", "content": "请帮我写测试", "additional_kwargs": {}},
+            ]
+        }
+
+        assert middleware._should_generate_title(state, allow_partial_exchange=True) is True
+        assert middleware._generate_title_result(state, allow_partial_exchange=True) == {"title": "请帮我写测试"}
+
     def test_generate_title_async_strips_think_tags_in_response(self, monkeypatch):
         """Async title generation strips <think> blocks from the model response."""
         _set_test_title_config(max_chars=50)
