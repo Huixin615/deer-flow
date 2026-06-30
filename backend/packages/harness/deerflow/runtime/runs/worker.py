@@ -646,17 +646,7 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
     tuple_config = getattr(ckpt_tuple, "config", {}) or {}
     tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
     checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
-    parent_checkpoint_id = tuple_configurable.get("checkpoint_id") if isinstance(tuple_configurable, dict) else None
-    # Thread the prior checkpoint id into ``configurable.checkpoint_id`` so
-    # DB-backed savers store it as ``parent_checkpoint_id``. Without this the
-    # title-bump checkpoint would be a sibling of the prior one in
-    # ``alist`` history (orphan in the parent-pointer chain), and any future
-    # LangGraph ``runs.resume_from`` / time-travel feature would have no
-    # backward edge to walk. Mirrors how every middleware-driven checkpoint
-    # write threads the prior id through.
-    write_config: dict[str, Any] = {"configurable": {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
-    if parent_checkpoint_id:
-        write_config["configurable"]["checkpoint_id"] = parent_checkpoint_id
+    write_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
     await _call_checkpointer_method(
         checkpointer,
         "aput",
