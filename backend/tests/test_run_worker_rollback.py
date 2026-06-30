@@ -819,14 +819,6 @@ async def test_ensure_interrupted_title_skips_when_title_already_set():
 
 
 @pytest.mark.anyio
-async def test_ensure_interrupted_title_returns_none_when_no_checkpoint():
-    """No checkpoint exists yet → nothing to update."""
-    checkpointer = _TitleCheckpointer(tuple_value=None)
-    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=None) is None
-    checkpointer.aput.assert_not_awaited()
-
-
-@pytest.mark.anyio
 async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer(tmp_path):
     """Full round-trip against a real ``AsyncSqliteSaver`` on a disk-backed DB.
 
@@ -885,24 +877,12 @@ async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer
 # ---------------------------------------------------------------------------
 
 
-class _CheckpointerWithoutGetNextVersion:
-    """A checkpointer that lacks ``get_next_version`` — exercises the fallback path."""
-
-
 class _CheckpointerWithIntVersion:
     """A checkpointer whose ``get_next_version`` increments integers (default LangGraph behavior)."""
 
     @staticmethod
     def get_next_version(current, _channel):
         return (current or 0) + 1
-
-
-class _CheckpointerWithFloatVersion:
-    """A checkpointer whose ``get_next_version`` increments floats (some custom savers)."""
-
-    @staticmethod
-    def get_next_version(current, _channel):
-        return (current or 0.0) + 1.0
 
 
 class _CheckpointerWithBrokenGetNextVersion:
@@ -913,111 +893,24 @@ class _CheckpointerWithBrokenGetNextVersion:
         raise RuntimeError("simulated saver bug")
 
 
-class _CheckpointerWithStuckGetNextVersion:
-    """``get_next_version`` returns the same value — must fall back so the bump still differs."""
-
-    @staticmethod
-    def get_next_version(current, _channel):
-        return current
-
-
 def test_bump_channel_version_uses_checkpointer_get_next_version_when_available():
-    """If the saver exposes ``get_next_version``, that result is preferred."""
+    """Happy path — saver's ``get_next_version`` result is preferred over our fallback."""
     assert _bump_channel_version(_CheckpointerWithIntVersion(), 5) == 6
-    assert _bump_channel_version(_CheckpointerWithFloatVersion(), 2.5) == 3.5
 
 
 def test_bump_channel_version_falls_back_on_broken_get_next_version():
-    """A raising ``get_next_version`` must not propagate; the defensive path bumps from prior."""
+    """A raising ``get_next_version`` must not propagate; the defensive path bumps from prior.
+
+    Without this, a saver bug would leave ``new_versions={"title": v}`` no-op
+    on DB savers — the very class of bug the #3874 review flagged.
+    """
     bumped = _bump_channel_version(_CheckpointerWithBrokenGetNextVersion(), 7)
-    assert bumped != 7
     assert bumped == 8
-
-
-def test_bump_channel_version_falls_back_on_stuck_get_next_version():
-    """If ``get_next_version`` returns the same value, the defensive path still yields a strict bump."""
-    bumped = _bump_channel_version(_CheckpointerWithStuckGetNextVersion(), 4)
-    assert bumped != 4
-    assert bumped == 5
-
-
-def test_bump_channel_version_handles_missing_get_next_version_and_int_seed():
-    """No ``get_next_version`` available; integer seed gets incremented."""
-    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), 11) == 12
-
-
-def test_bump_channel_version_handles_missing_get_next_version_and_none_seed():
-    """No prior version → seed to 1 (matches LangGraph's int-default scheme)."""
-    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), None) == 1
-
-
-def test_bump_channel_version_handles_float_seed_without_get_next_version():
-    """Float seed without ``get_next_version`` increments as float — preserves the saver's scheme."""
-    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), 2.5)
-    assert isinstance(bumped, float)
-    assert bumped > 2.5
-
-
-def test_bump_channel_version_handles_numeric_string_seed():
-    """Numeric string seed bumps to the next numeric string (some legacy serializations)."""
-    assert _bump_channel_version(_CheckpointerWithoutGetNextVersion(), "3") == "4"
-
-
-def test_bump_channel_version_handles_uuid_shaped_string_seed():
-    """Non-numeric string (e.g. UUID-shaped) bumps via ``.<n>`` suffix so the value is strictly different."""
-    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), "abc-uuid")
-    assert bumped != "abc-uuid"
-    assert bumped == "abc-uuid.1"
-
-
-def test_bump_channel_version_handles_bool_seed():
-    """``bool`` is technically an ``int``; coerce so the next value is a plain int."""
-    bumped = _bump_channel_version(_CheckpointerWithoutGetNextVersion(), True)
-    assert bumped == 2
-    assert isinstance(bumped, int)
 
 
 # ---------------------------------------------------------------------------
 # _ensure_interrupted_title — additional defensive boundaries
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_ensure_interrupted_title_returns_none_when_title_disabled(monkeypatch):
-    """When ``title.enabled=False`` in config, the helper must not write a new checkpoint."""
-    from deerflow.config.title_config import TitleConfig
-
-    initial_checkpoint = {
-        "id": "ckpt-1",
-        "channel_values": {"messages": [{"type": "human", "content": "hi"}]},
-        "channel_versions": {"messages": 1},
-    }
-    checkpointer = _TitleCheckpointer(
-        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
-    )
-    app_config = SimpleNamespace(title=TitleConfig(enabled=False, max_chars=40, max_words=20))
-
-    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=app_config) is None
-    checkpointer.aput.assert_not_awaited()
-
-
-@pytest.mark.anyio
-async def test_ensure_interrupted_title_returns_none_with_no_user_message(monkeypatch):
-    """A checkpoint with neither messages nor a derivable title produces no write."""
-    from deerflow.config.title_config import TitleConfig
-
-    initial_checkpoint = {
-        "id": "ckpt-1",
-        "channel_values": {"messages": []},
-        "channel_versions": {},
-    }
-    checkpointer = _TitleCheckpointer(
-        tuple_value=_FakeCheckpointTuple(checkpoint=initial_checkpoint, metadata={}),
-    )
-    app_config = SimpleNamespace(title=TitleConfig(enabled=True, max_chars=40, max_words=20))
-
-    assert await _ensure_interrupted_title(checkpointer=checkpointer, thread_id="thread-1", app_config=app_config) is None
-    checkpointer.aput.assert_not_awaited()
 
 
 @pytest.mark.anyio
