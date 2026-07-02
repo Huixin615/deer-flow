@@ -449,7 +449,6 @@ export function InputBox({
       );
       const uploadValidation = validateUploadLimits([], files, uploadLimits);
       if (uploadValidation.violations.length > 0) {
-        reportUploadLimitViolations(uploadValidation.violations);
         return Promise.reject(new Error("Attachment limits exceeded."));
       }
       const placeholder = findSuggestionTemplatePlaceholder(message.text);
@@ -498,7 +497,6 @@ export function InputBox({
       onContextChange,
       onSubmit,
       onStop,
-      reportUploadLimitViolations,
       resolvedModelName,
       selectedModel?.supports_thinking,
       status,
