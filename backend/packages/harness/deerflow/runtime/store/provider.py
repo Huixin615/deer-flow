@@ -75,7 +75,11 @@ def _get_store_config() -> CheckpointerConfig:
     legacy_config = get_checkpointer_config()
     if legacy_config is not None:
         return legacy_config
-    return _resolve_store_config(get_app_config())
+    try:
+        app_config = get_app_config()
+    except FileNotFoundError:
+        return CheckpointerConfig(type="memory")
+    return _resolve_store_config(app_config)
 
 
 # ---------------------------------------------------------------------------
