@@ -187,6 +187,7 @@ def test_feishu_on_message_extracts_image_and_file_keys():
         assert files == [{"image_key": "img_123"}, {"file_key": "file_456"}]
         assert "[image]" in mock_make_inbound.call_args[1]["text"]
         assert "[file]" in mock_make_inbound.call_args[1]["text"]
+        assert channel._pending_inbound_batches == {}
 
 
 def test_feishu_on_message_reuses_stored_parent_topic_for_card_replies():
@@ -278,7 +279,6 @@ def test_feishu_batches_top_level_file_messages_from_same_user(monkeypatch):
         channel._on_message(_make_file_event("file_b", message_id="msg_file_2"))
 
         inbound = await asyncio.wait_for(bus.get_inbound(), timeout=0.5)
-        await asyncio.sleep(0.01)
 
         assert inbound.thread_ts == "msg_file_1"
         assert inbound.topic_id == "msg_file_1"
@@ -288,12 +288,44 @@ def test_feishu_batches_top_level_file_messages_from_same_user(monkeypatch):
         assert inbound.metadata["topic_id"] == "msg_file_1"
         assert inbound.metadata["batched_message_ids"] == ["msg_file_1", "msg_file_2"]
         channel._ensure_running_card_started.assert_called_once_with("msg_file_1")
-        assert [call.args for call in channel._add_reaction.await_args_list] == [
+        assert [call.args for call in channel._add_reaction.call_args_list] == [
             ("msg_file_1", "OK"),
             ("msg_file_2", "OK"),
         ]
 
     _run(go())
+
+
+def test_feishu_rich_text_file_message_does_not_enter_batch():
+    bus = MessageBus()
+    channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
+    channel._schedule_prepare_inbound = MagicMock()
+
+    event = MagicMock()
+    event.event.message.chat_id = "chat_1"
+    event.event.message.message_id = "msg_rich_file"
+    event.event.message.root_id = None
+    event.event.message.parent_id = None
+    event.event.message.thread_id = None
+    event.event.sender.sender_id.open_id = "user_1"
+    event.event.message.content = json.dumps(
+        {
+            "content": [
+                [
+                    {"tag": "text", "text": "Review"},
+                    {"tag": "file", "file_key": "file_a"},
+                ]
+            ]
+        }
+    )
+
+    channel._on_message(event)
+
+    channel._schedule_prepare_inbound.assert_called_once()
+    inbound = channel._schedule_prepare_inbound.call_args.args[1]
+    assert inbound.text == "Review [file]"
+    assert inbound.files == [{"file_key": "file_a"}]
+    assert channel._pending_inbound_batches == {}
 
 
 def test_feishu_file_batch_window_expiry_starts_new_topic(monkeypatch):

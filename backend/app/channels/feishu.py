@@ -721,12 +721,13 @@ class FeishuChannel(Channel):
     def _is_batchable_file_inbound(
         *,
         msg_type: InboundMessageType,
+        text: str,
         files: list[dict[str, Any]],
         root_id: str | None,
         parent_id: str | None,
         thread_id: str | None,
     ) -> bool:
-        return msg_type == InboundMessageType.CHAT and bool(files) and not (root_id or parent_id or thread_id)
+        return msg_type == InboundMessageType.CHAT and text in {"[file]", "[image]"} and len(files) == 1 and not (root_id or parent_id or thread_id)
 
     def _schedule_prepare_inbound(
         self,
@@ -1032,6 +1033,7 @@ class FeishuChannel(Channel):
 
             if self._is_batchable_file_inbound(
                 msg_type=msg_type,
+                text=text,
                 files=files_list,
                 root_id=root_id,
                 parent_id=parent_id,
