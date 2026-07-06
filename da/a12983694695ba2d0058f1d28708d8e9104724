@@ -1,0 +1,229 @@
+README.md
+  s_10b9add390ab99::t_2678744becb65b 633-634
+README_fr.md
+  s_10b9add390ab99::t_95d9cfe9024bff 63,70-71,290-291,297-298,327-331,357-369,392-399,425-440,547-562,632-634,639-681
+README_ja.md
+  s_10b9add390ab99::t_25138d4ad1f6d8 63,70-71,277-278,284-285,314-318,344-356,379-386,412-427,534-549,599,619-621,626-668
+README_ru.md
+  s_10b9add390ab99::t_a5c27a07e09ad5 65,72-73,279-280,286-287,301-305,317-329,338-364,370-385,475-490,538,558-599,602-605
+README_zh.md
+  s_10b9add390ab99::t_ffb02096a80f19 62,69,298-299,305,365-377,404-407,437-444,517-518,561-576,624,644-646,651-673
+backend/AGENTS.md
+  s_10b9add390ab99::t_aa9d987aa689f7 230-232,236-252,287-291,315,352-357,379,391,563-564,582-586,704
+backend/app/gateway/deps.py
+  s_10b9add390ab99::t_83a4c2dd228230 22,49-69,234-239
+backend/app/gateway/routers/memory.py
+  s_10b9add390ab99::t_28ad0ae000d5b8 134-138,368-372,404-408
+backend/app/gateway/routers/threads.py
+  s_10b9add390ab99::t_e88d228ee1499c 15,17,19,34,48-50,60-208,340-357,544-635
+backend/docs/CONFIGURATION.md
+  s_10b9add390ab99::t_0d522830b24210 345-370
+backend/packages/harness/deerflow/agents/human_input.py
+  s_10b9add390ab99::t_5aed5c9e36acd3 1-76
+backend/packages/harness/deerflow/agents/memory/message_processing.py
+  s_10b9add390ab99::t_fc5efc6e10d328 9-10,71-72
+backend/packages/harness/deerflow/agents/memory/prompt.py
+  s_10b9add390ab99::t_685008fc0d5e08 118-119,139-140,144-172
+backend/packages/harness/deerflow/agents/memory/updater.py
+  s_10b9add390ab99::t_39d9e288d03500 14,19,306-323,329,400-466,534-544,549,767,772-809
+backend/packages/harness/deerflow/agents/middlewares/clarification_middleware.py
+  s_10b9add390ab99::t_02618e4e934bfb 7,47-100,124,217-219,223,227
+backend/packages/harness/deerflow/agents/middlewares/delegation_ledger.py
+  s_10b9add390ab99::t_fd6263e51300c3 66-67
+backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py
+  s_10b9add390ab99::t_0dc53285e800d3 34,94-95,101-102
+backend/packages/harness/deerflow/agents/middlewares/read_before_write_middleware.py
+  s_10b9add390ab99::t_7e635fdbd9d821 42,111-113,144
+backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py
+  s_10b9add390ab99::t_22735917706d40 19-22,86-87,135,151,221-225,231-241,244-256
+backend/packages/harness/deerflow/agents/middlewares/tool_progress_middleware.py
+  s_10b9add390ab99::t_67fc41c1ad32ad 1-578
+backend/packages/harness/deerflow/agents/middlewares/tool_result_meta.py
+  s_10b9add390ab99::t_5f9b1acab60afc 1-212
+backend/packages/harness/deerflow/client.py
+  s_10b9add390ab99::t_331cc8cd2f2b32 1322-1326
+backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py
+  s_10b9add390ab99::t_9d56c61e66ac91 30-37,56,114,361-363,398,630-632,634-644,647-652,955
+backend/packages/harness/deerflow/community/boxlite/README.md
+  s_10b9add390ab99::t_5b6a97fa6732da 19-20,25-26,28,31-36,47-49,69-71
+backend/packages/harness/deerflow/community/boxlite/__init__.py
+  s_10b9add390ab99::t_8b3b820873ee8d 20-21,25,27
+backend/packages/harness/deerflow/community/boxlite/box.py
+  s_10b9add390ab99::t_cc2604458eadf2 32,64,127-131,140
+backend/packages/harness/deerflow/community/boxlite/provider.py
+  s_10b9add390ab99::t_def1b1c6457584 11,18,21-22,32,43,63,67-75,88-90,92-98,101-102,106-107,109-111,117-156,161-172,178-181,186-187,197-198,204-205,212-321,323-333,339-343,345-356,362,373-374,381-387,392-427,429-440,443-450,452-454,457,464-467,469,471,473,475
+backend/packages/harness/deerflow/community/warm_pool_lifecycle.py
+  s_10b9add390ab99::t_a002f24547a6ea 1-127
+backend/packages/harness/deerflow/config/app_config.py
+  s_10b9add390ab99::t_ada3423532d4db 42,178
+backend/packages/harness/deerflow/config/memory_config.py
+  s_10b9add390ab99::t_0bb652d8438e73 101-134
+backend/packages/harness/deerflow/config/sandbox_config.py
+  s_10b9add390ab99::t_d7db7654f7f25a 33-38,55,63,71
+backend/packages/harness/deerflow/config/tool_progress_config.py
+  s_10b9add390ab99::t_e799e3c8fbe38e 1-45
+backend/packages/harness/deerflow/subagents/executor.py
+  s_10b9add390ab99::t_a87abcb28d9499 22,35,62,71,144-186,710,717-737
+backend/packages/harness/deerflow/subagents/status_contract.py
+  s_10b9add390ab99::t_66d0901abdb3c9 41,53,56-64,107,110-111,146-154,174
+backend/packages/harness/deerflow/tools/builtins/task_tool.py
+  s_10b9add390ab99::t_7d5cff1711f899 64,486-506
+backend/packages/harness/deerflow/workspace_changes/diff.py
+  s_10b9add390ab99::t_f144ecc1f205e8 178
+backend/packages/harness/deerflow/workspace_changes/scanner.py
+  s_10b9add390ab99::t_4c0b017190164b 6,77,199,202-209,225,228,245-261,263-264,266-273,275-277
+backend/packages/harness/pyproject.toml
+  s_10b9add390ab99::t_c347bb224b2474 67
+backend/tests/test_aio_sandbox_provider.py
+  s_10b9add390ab99::t_19fb8a3b44ef83 629-691
+backend/tests/test_boxlite_provider.py
+  s_10b9add390ab99::t_5cb3f1f334f9fa 3-4,9,11-12,20-62,69-90,93,105,141-710
+backend/tests/test_clarification_middleware.py
+  s_10b9add390ab99::t_3bf046ef0da031 125-217,243-246,253-277,303
+backend/tests/test_client.py
+  s_10b9add390ab99::t_10384ac68a0c41 2620-2624,2644-2648
+backend/tests/test_delegation_ledger.py
+  s_10b9add390ab99::t_b85fca4cec93af 184-211
+backend/tests/test_gateway_runtime_cleanup.py
+  s_10b9add390ab99::t_ceedf8d3f05c34 46-55
+backend/tests/test_gateway_services.py
+  s_10b9add390ab99::t_857806efd23d20 135-165
+backend/tests/test_harness_packaging.py
+  s_10b9add390ab99::t_7ae2968c1c5dc7 1-16
+backend/tests/test_human_input.py
+  s_10b9add390ab99::t_9241a2de307ded 1-24
+backend/tests/test_input_sanitization_middleware.py
+  s_10b9add390ab99::t_91af9d19af94ac 249-266,397-423
+backend/tests/test_memory_staleness_review.py
+  s_10b9add390ab99::t_2da4b3c409195a 1-651
+backend/tests/test_memory_upload_filtering.py
+  s_10b9add390ab99::t_26f95c143b30fb 180-232
+backend/tests/test_multi_worker_postgres_gate.py
+  s_10b9add390ab99::t_8850e492d87ee6 1-142
+backend/tests/test_read_before_write_middleware.py
+  s_10b9add390ab99::t_b8191c9c8e7683 216-225,242-257
+backend/tests/test_subagent_executor.py
+  s_10b9add390ab99::t_c6982d1931c00d 892-965,1691-1715
+backend/tests/test_subagent_status_contract.py
+  s_10b9add390ab99::t_2b0e312ff412eb 16,65-90,130-149
+backend/tests/test_task_tool_core_logic.py
+  s_10b9add390ab99::t_e5f730490e6bbe 35,162-179,735-773
+backend/tests/test_threads_router.py
+  s_10b9add390ab99::t_22dbbf5458a63c 1,10-11,71-96,571-780
+backend/tests/test_tool_error_handling_middleware.py
+  s_10b9add390ab99::t_ac548cc3df0df3 13,160-225,400-416
+backend/tests/test_tool_progress_middleware.py
+  s_10b9add390ab99::t_b1da294460d1f3 1-1479
+backend/tests/test_tool_result_meta.py
+  s_10b9add390ab99::t_ecf7be3eace8bc 1-474
+backend/tests/test_warm_pool_lifecycle.py
+  s_10b9add390ab99::t_2e0ca8ef80efb2 1-95
+backend/tests/test_workspace_changes.py
+  s_10b9add390ab99::t_fb8f32d68fb1d3 21,73-164
+backend/uv.lock
+  s_10b9add390ab99::t_ebd12622fb4b8e 488-498,899-901,928,968
+config.example.yaml
+  s_10b9add390ab99::t_1c93860765521b 18,937-961,1114-1139,1370-1389
+contracts/subagent_status_contract.json
+  s_10b9add390ab99::t_7f08d5ccf37cd9 4
+docker/docker-compose-dev.yaml
+  s_10b9add390ab99::t_886e1ddebe282e 158-161,183-184
+frontend/AGENTS.md
+  s_10b9add390ab99::t_061528f60c95b1 74-75,87,89
+frontend/src/app/page.tsx
+  s_10b9add390ab99::t_98ed04f2a94672 12
+frontend/src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx
+  s_10b9add390ab99::t_aaa75851648355 5,35-41,179-203,221-228,310-314,384-386
+frontend/src/app/workspace/agents/new/page.tsx
+  s_10b9add390ab99::t_515a354fabbbd4 41-47,120-127,226,233-262,412-414,444,450,453-455
+frontend/src/app/workspace/chats/[thread_id]/page.tsx
+  s_10b9add390ab99::t_ee894f36b43dcc 4-5,37-43,48,80,180-203,212-237,247-254,317-330,398-400
+frontend/src/components/landing/header.tsx
+  s_10b9add390ab99::t_55b912bb94b2b8 11-12,26,30,35,37,40,74,80-85
+frontend/src/components/landing/hero.tsx
+  s_10b9add390ab99::t_8490baaab95855 4,6,8,15-30,57-59,61-64,77,79-80,83,93-133
+frontend/src/components/landing/mobile-nav.tsx
+  s_10b9add390ab99::t_30572abcc6c27c 3-5,7-14,16-19,21-22,24-47
+frontend/src/components/landing/section.tsx
+  s_10b9add390ab99::t_410f69fe09b4fe 15-19,23,28
+frontend/src/components/landing/sections/case-study-section.tsx
+  s_10b9add390ab99::t_76fb0802c31a25 54
+frontend/src/components/workspace/artifacts/artifact-trigger.tsx
+  s_10b9add390ab99::t_642c3cbb2aa8af 20,22,25,32
+frontend/src/components/workspace/chats/chat-box.tsx
+  s_10b9add390ab99::t_cb5197fec51b80 7-13,15,35,139-234,271
+frontend/src/components/workspace/export-trigger.tsx
+  s_10b9add390ab99::t_c4796fc06e5b50 61,66
+frontend/src/components/workspace/input-box-helpers.ts
+  s_10b9add390ab99::t_303c7b5af58c3b 2-5
+frontend/src/components/workspace/input-box.tsx
+  s_10b9add390ab99::t_7806aece059abd 616,1071-1082,1171,1574-1576,1582,1612,1614,1622,1624
+frontend/src/components/workspace/messages/human-input-card.tsx
+  s_10b9add390ab99::t_78951d3e8a675c 1-244
+frontend/src/components/workspace/messages/message-list.tsx
+  s_10b9add390ab99::t_0b4e0a8cc1c40d 5,32-38,55,76-79,223-224,226,228,245-252,254,256,278-283,316-393,520-528,531,549,552,556,563-592,594,603,606,612,621,632-633,635,638,787-832,1029-1041
+frontend/src/components/workspace/sidecar/sidecar-panel.tsx
+  s_10b9add390ab99::t_49ebe1f9ecce61 11,39-46,52-58,69,157-159,212-219,229-230,360,384,392-422,503-535,553-581,596,599-603,681-729
+frontend/src/components/workspace/thread-scheduled-tasks-link.tsx
+  s_10b9add390ab99::t_05cde49602af33 1,12,15-16
+frontend/src/core/i18n/locales/en-US.ts
+  s_10b9add390ab99::t_ab956ed8c8af4d 54-55,438-439,455-459,541-551
+frontend/src/core/i18n/locales/types.ts
+  s_10b9add390ab99::t_b123df5e53f436 43-44,348-349,365-368,439-449
+frontend/src/core/i18n/locales/zh-CN.ts
+  s_10b9add390ab99::t_7c616750e7bd2d 54-55,422-423,439-443,524-534
+frontend/src/core/messages/human-input.ts
+  s_10b9add390ab99::t_909fa65cf6e831 1-326
+frontend/src/core/suggestions/placeholders.ts
+  s_10b9add390ab99::t_9d45d825a39b25 1-30
+frontend/src/core/tasks/subtask-result.ts
+  s_10b9add390ab99::t_da0f6977b71376 59
+frontend/src/core/threads/api.ts
+  s_10b9add390ab99::t_4799665a02f8f2 6-34,54-81
+frontend/src/core/threads/hooks.ts
+  s_10b9add390ab99::t_51ff9920116735 30,1998-2026,2047-2052
+frontend/src/hooks/use-mobile.ts
+  s_10b9add390ab99::t_76ca32d61e3eaf 4,6-14,16-18,20-21
+frontend/src/styles/globals.css
+  s_10b9add390ab99::t_bc36c6ed35b994 244,278
+frontend/tests/e2e/branch-thread.spec.ts
+  s_10b9add390ab99::t_8caed48dbbc1cc 1-66
+frontend/tests/e2e/landing.spec.ts
+  s_10b9add390ab99::t_4db243771fdb67 10,12-13,21-32
+frontend/tests/e2e/sidecar-chat.spec.ts
+  s_10b9add390ab99::t_294fa53f7f1d10 108-133,784-787,950-951,970-973,1280-1548
+frontend/tests/e2e/ui-polish-mobile.spec.ts
+  s_10b9add390ab99::t_2c5560f62841b8 1-78
+frontend/tests/e2e/utils/mock-api.ts
+  s_10b9add390ab99::t_94f16d77ab6e40 140-158,694-709,715-768
+frontend/tests/unit/components/workspace/messages/human-input-card.test.ts
+  s_10b9add390ab99::t_3ab18941a6d226 1-136
+frontend/tests/unit/core/messages/human-input.test.ts
+  s_10b9add390ab99::t_1013d397f3eba6 1-223
+frontend/tests/unit/core/suggestions/placeholders.test.ts
+  s_10b9add390ab99::t_c15699cf46ade4 1-57
+frontend/tests/unit/core/tasks/subtask-result.test.ts
+  s_10b9add390ab99::t_e6becf0f071323 148,153,162-176
+frontend/tests/unit/core/threads/api.test.ts
+  s_10b9add390ab99::t_9141b8f4ae0c50 56-114
+frontend/tests/unit/core/threads/send-message.test.ts
+  s_10b9add390ab99::t_52155c55f9e25c 63-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "daa12983694695ba2d0058f1d28708d8e9104724",
+  "prompts": {},
+  "sessions": {
+    "s_10b9add390ab99": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f36a9-b49f-7ff2-84c1-7b86d62efa76",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
