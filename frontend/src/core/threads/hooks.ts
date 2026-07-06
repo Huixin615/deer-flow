@@ -27,7 +27,7 @@ import { messageToStep } from "../tasks/steps";
 import type { UploadedFileInfo } from "../uploads";
 import { promptInputFilePartToFile, uploadFiles } from "../uploads";
 
-import { fetchThreadTokenUsage } from "./api";
+import { branchThreadFromTurn, fetchThreadTokenUsage } from "./api";
 import {
   buildThreadsSearchQueryOptions,
   DEFAULT_THREAD_SEARCH_PARAMS,
@@ -1995,6 +1995,35 @@ export function useThreadTokenUsage(
   });
 }
 
+export function useBranchThread() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      threadId,
+      messageId,
+      messageIds,
+      title,
+    }: {
+      threadId: string;
+      messageId: string;
+      messageIds?: string[];
+      title?: string;
+    }) => branchThreadFromTurn(threadId, { messageId, messageIds, title }),
+    onSuccess(response, { threadId }) {
+      void queryClient.invalidateQueries({
+        queryKey: ["thread", "metadata", response.thread_id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["thread", "metadata", threadId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+      void queryClient.invalidateQueries({
+        queryKey: INFINITE_THREADS_QUERY_KEY_PREFIX,
+      });
+    },
+  });
+}
+
 export function useRunDetail(threadId: string, runId: string) {
   const apiClient = getAPIClient();
   return useQuery<Run>({
@@ -2015,7 +2044,12 @@ async function deleteLocalThreadData(threadId: string) {
     },
   );
 
-  if (!response.ok) {
+  // A 404 means the thread is already gone — the desired end state. The prior
+  // `apiClient.threads.delete` call hits the same gateway handler (nginx
+  // rewrites /api/langgraph/threads/* to /api/threads/*) and removes the
+  // thread_meta row, so this second delete's ownership guard 404s. Treat it as
+  // success to keep the delete idempotent.
+  if (!response.ok && response.status !== 404) {
     const error = await response
       .json()
       .catch(() => ({ detail: "Failed to delete local thread data." }));

@@ -51,6 +51,8 @@ export const zhCN: Translations = {
     exportAsJSON: "导出为 JSON",
     exportSuccess: "对话已导出",
     regenerate: "重新生成",
+    branch: "分叉",
+    showArtifacts: "查看此对话的文件",
   },
 
   // Home
@@ -417,6 +419,8 @@ export const zhCN: Translations = {
   conversation: {
     noMessages: "还没有消息",
     startConversation: "开始新的对话以查看消息",
+    branchCreated: "已创建分叉对话",
+    branchFailed: "创建分叉对话失败。",
   },
 
   // Chats
@@ -432,6 +436,11 @@ export const zhCN: Translations = {
     title: "侧边对话",
     open: "打开侧边对话",
     close: "关闭侧边对话",
+    delete: "删除侧边对话",
+    deleteConfirm:
+      "确定要删除该侧边对话吗？此操作不可撤销。如果只是想隐藏，请使用顶部的侧边对话开关。",
+    deleteSuccess: "侧边对话已删除",
+    deleteFailed: "删除侧边对话失败。",
     addToConversation: "添加到对话",
     askInSideChat: "在侧边聊天中提问",
     reference: "引用",
@@ -510,6 +519,17 @@ export const zhCN: Translations = {
     clickToViewContent: "点击查看文件内容",
     writeTodos: "更新 To-do 列表",
     skillInstallTooltip: "安装技能并使其可在 DeerFlow 中使用",
+  },
+
+  humanInput: {
+    answered: "已回答",
+    pending: "发送中...",
+    readOnly: "只读",
+    otherLabel: "其他回答",
+    otherPlaceholder: "输入其他回答...",
+    submit: "提交",
+    emptyError: "请输入回答后再提交。",
+    answeredValue: (value: string) => `已回答：${value}`,
   },
 
   uploads: {

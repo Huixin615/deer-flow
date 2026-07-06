@@ -51,6 +51,8 @@ export const enUS: Translations = {
     exportAsJSON: "Export as JSON",
     exportSuccess: "Conversation exported",
     regenerate: "Regenerate",
+    branch: "Branch conversation",
+    showArtifacts: "Show artifacts of this conversation",
   },
 
   // Home
@@ -433,6 +435,8 @@ export const enUS: Translations = {
   conversation: {
     noMessages: "No messages yet",
     startConversation: "Start a conversation to see messages here",
+    branchCreated: "Conversation branch created",
+    branchFailed: "Failed to branch conversation.",
   },
 
   // Chats
@@ -448,6 +452,11 @@ export const enUS: Translations = {
     title: "Side chat",
     open: "Open side chat",
     close: "Close side chat",
+    delete: "Delete side chat",
+    deleteConfirm:
+      "Are you sure you want to delete this side chat? This action cannot be undone. To simply hide it, use the side chat toggle in the header instead.",
+    deleteSuccess: "Side chat deleted",
+    deleteFailed: "Failed to delete side chat.",
     addToConversation: "Add to conversation",
     askInSideChat: "Ask in side chat",
     reference: "Reference",
@@ -527,6 +536,17 @@ export const enUS: Translations = {
     clickToViewContent: "Click to view file content",
     writeTodos: "Update to-do list",
     skillInstallTooltip: "Install skill and make it available to DeerFlow",
+  },
+
+  humanInput: {
+    answered: "Answered",
+    pending: "Sending...",
+    readOnly: "Read only",
+    otherLabel: "Other answer",
+    otherPlaceholder: "Type another answer...",
+    submit: "Submit",
+    emptyError: "Enter an answer before submitting.",
+    answeredValue: (value: string) => `Answered: ${value}`,
   },
 
   // Subtasks
