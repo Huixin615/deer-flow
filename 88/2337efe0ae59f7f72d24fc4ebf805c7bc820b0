@@ -1,0 +1,25 @@
+backend/AGENTS.md
+  s_b945deda9f0521::t_ea5a622bb59cc5 226
+backend/packages/harness/deerflow/agents/middlewares/dangling_tool_call_middleware.py
+  s_b945deda9f0521::t_9767d2fa111931 33-46,71-79,102-109,117,128-129,153-210,237-238,250-251
+backend/tests/test_dangling_tool_call_middleware.py
+  s_b945deda9f0521::t_9dc5419a568c9e 7,162-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "882337efe0ae59f7f72d24fc4ebf805c7bc820b0",
+  "prompts": {},
+  "sessions": {
+    "s_b945deda9f0521": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f44d1-7f2b-7b72-a379-d851cf0973fc",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
