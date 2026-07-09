@@ -46,8 +46,6 @@ class _FakeRedis:
     async def xread(self, streams, count=None, block=None):
         [(name, last_id)] = list(streams.items())
         timeout = None if block is None else block / 1000
-        if last_id == "$":
-            last_id = self.streams[name][-1][0] if self.streams.get(name) else "0-0"
         while True:
             async with self.conditions[name]:
                 entries = [(event_id, fields) for event_id, fields in self.streams.get(name, []) if _stream_id_gt(event_id, last_id)]
@@ -509,6 +507,49 @@ async def test_redis_invalid_last_event_id_tails_live_events(redis_bridge: Redis
                     break
 
     assert [entry.event for entry in received[:-1]] == ["values"]
+    assert received[-1] is END_SENTINEL
+
+
+@pytest.mark.anyio
+async def test_redis_invalid_last_event_id_tails_empty_stream(redis_bridge: RedisStreamBridge):
+    """Malformed reconnect ids should still wait for the first Redis event."""
+    run_id = "redis-run-invalid-empty"
+    received = []
+
+    async def publish_later() -> None:
+        await anyio.sleep(0.05)
+        await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
+        await redis_bridge.publish_end(run_id)
+
+    with anyio.fail_after(2):
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(publish_later)
+            async for entry in redis_bridge.subscribe(run_id, last_event_id="-1", heartbeat_interval=0.01):
+                if entry is HEARTBEAT_SENTINEL:
+                    continue
+                received.append(entry)
+                if entry is END_SENTINEL:
+                    break
+
+    assert [entry.event for entry in received[:-1]] == ["metadata"]
+    assert received[-1] is END_SENTINEL
+
+
+@pytest.mark.anyio
+async def test_redis_invalid_last_event_id_on_terminal_run_replays_end(redis_bridge: RedisStreamBridge):
+    """Malformed reconnect ids on terminal streams should drain END instead of hanging."""
+    run_id = "redis-run-invalid-terminal"
+
+    await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
+    await redis_bridge.publish_end(run_id)
+
+    received = []
+    async for entry in redis_bridge.subscribe(run_id, last_event_id="-1", heartbeat_interval=1.0):
+        received.append(entry)
+        if entry is END_SENTINEL:
+            break
+
+    assert [entry.event for entry in received[:-1]] == ["metadata"]
     assert received[-1] is END_SENTINEL
 
 

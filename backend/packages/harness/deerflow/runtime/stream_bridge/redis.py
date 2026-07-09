@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 _KIND_EVENT = "event"
 _KIND_END = "end"
-_REDIS_STREAM_ID_RE = re.compile(r"^\d+-\d+$")
+_REDIS_STREAM_ID_RE = re.compile(r"\d+(-\d+)?")
 
 # Batch size for ``XREAD``. Reading more than one entry per round-trip collapses
 # a large ``Last-Event-ID`` replay into far fewer calls; live tailing still
@@ -172,7 +172,10 @@ class RedisStreamBridge(StreamBridge):
         entries = await self._redis.xrevrange(key, count=1)
         if not entries:
             return "0-0"
-        event_id, _fields = entries[0]
+        event_id, fields = entries[0]
+        payload = self._normalise_fields(fields)
+        if payload.get("kind") == _KIND_END:
+            return "0-0"
         return self._decode(event_id)
 
     async def subscribe(
