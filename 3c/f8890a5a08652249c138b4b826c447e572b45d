@@ -1,0 +1,27 @@
+README.md
+  s_b8f5464686e061::t_a7ec25c14f479e 266
+backend/AGENTS.md
+  s_b8f5464686e061::t_1c89abb90d3c4b 332
+backend/packages/harness/deerflow/runtime/stream_bridge/redis.py
+  s_b8f5464686e061::t_6af7eeb55565c2 9,36,167-174,183,191-193,195,199
+backend/tests/test_stream_bridge.py
+  s_b8f5464686e061::t_a9b7466ba49436 49-50,484-510,819-821,910-911,916-931
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "3cf8890a5a08652249c138b4b826c447e572b45d",
+  "prompts": {},
+  "sessions": {
+    "s_b8f5464686e061": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f45e2-2b3d-7580-9ce4-7ee70327827e",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
