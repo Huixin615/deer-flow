@@ -25,6 +25,7 @@ from deerflow.subagents.executor import (
 )
 from deerflow.subagents.status_contract import (
     SubagentStatusValue,
+    SubagentStopReasonValue,
     format_subagent_result_message,
     make_subagent_additional_kwargs,
 )
@@ -198,8 +199,9 @@ def _task_result_command(
     status: SubagentStatusValue,
     result: str | None = None,
     error: str | None = None,
+    stop_reason: SubagentStopReasonValue | None = None,
 ) -> Command:
-    content, metadata_error = format_subagent_result_message(status, result=result, error=error)
+    content, metadata_error = format_subagent_result_message(status, result=result, error=error, stop_reason=stop_reason)
     return Command(
         update={
             "messages": [
@@ -207,7 +209,7 @@ def _task_result_command(
                     content=content,
                     tool_call_id=tool_call_id,
                     name="task",
-                    additional_kwargs=make_subagent_additional_kwargs(status, result=result, error=metadata_error),
+                    additional_kwargs=make_subagent_additional_kwargs(status, result=result, error=metadata_error, stop_reason=stop_reason),
                 )
             ]
         }
@@ -445,10 +447,14 @@ async def task_tool(
                 writer({"type": "task_completed", "task_id": task_id, "result": result.result, "usage": usage})
                 logger.info(f"[trace={trace_id}] Task {task_id} completed after {poll_count} polls")
                 cleanup_background_task(task_id)
+                # stop_reason carries a guardrail cap (token_capped / turn_capped)
+                # when the run was ended early but still produced a final answer
+                # — the work survives on result_brief like a clean success.
                 return _task_result_command(
                     tool_call_id=tool_call_id,
                     status="completed",
                     result=result.result,
+                    stop_reason=result.stop_reason,
                 )
             elif result.status == SubagentStatus.FAILED:
                 _cache_subagent_usage(tool_call_id, usage, enabled=cache_token_usage)
@@ -456,10 +462,14 @@ async def task_tool(
                 writer({"type": "task_failed", "task_id": task_id, "error": result.error, "usage": usage})
                 logger.error(f"[trace={trace_id}] Task {task_id} failed: {result.error}")
                 cleanup_background_task(task_id)
+                # A turn-capped run with no usable output surfaces as failed +
+                # stop_reason=turn_capped; the cap note lets the lead tell "out
+                # of budget" from "broken subagent".
                 return _task_result_command(
                     tool_call_id=tool_call_id,
                     status="failed",
                     error=result.error,
+                    stop_reason=result.stop_reason,
                 )
             elif result.status == SubagentStatus.CANCELLED:
                 _cache_subagent_usage(tool_call_id, usage, enabled=cache_token_usage)
