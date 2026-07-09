@@ -70,6 +70,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         tool_calls = getattr(msg, "tool_calls", None) or []
         for tool_call in tool_calls:
             if not isinstance(tool_call, dict):
+                logger.debug("Skipping malformed non-dict tool_call in AIMessage: %r", tool_call)
                 continue
             original_name = tool_call.get("name")
             normalized_call = dict(tool_call)
@@ -111,15 +112,17 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         for invalid_tc in getattr(msg, "invalid_tool_calls", None) or []:
             if not isinstance(invalid_tc, dict):
                 continue
-            normalized.append(
-                {
-                    "id": invalid_tc.get("id"),
-                    "name": _normalize_tool_name(invalid_tc.get("name")),
-                    "args": {},
-                    "invalid": True,
-                    "error": invalid_tc.get("error"),
-                }
-            )
+            original_name = invalid_tc.get("name")
+            normalized_call = {
+                "id": invalid_tc.get("id"),
+                "name": _normalize_tool_name(original_name),
+                "args": {},
+                "invalid": True,
+                "error": invalid_tc.get("error"),
+            }
+            if _has_invalid_tool_name(original_name):
+                normalized_call["invalid_tool_name"] = True
+            normalized.append(normalized_call)
 
         return normalized
 
@@ -161,6 +164,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
         tool_calls = getattr(msg, "tool_calls", None)
         if tool_calls:
+            structured_changed = False
             sanitized_tool_calls = []
             for tool_call in tool_calls:
                 if not isinstance(tool_call, dict):
@@ -171,13 +175,16 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
                 normalized_name = _normalize_tool_name(name)
                 if sanitized.get("name") != normalized_name:
                     sanitized["name"] = normalized_name
-                    changed = True
+                    structured_changed = True
                 sanitized_tool_calls.append(sanitized)
-            update["tool_calls"] = sanitized_tool_calls
+            if structured_changed:
+                update["tool_calls"] = sanitized_tool_calls
+                changed = True
 
         additional_kwargs = dict(getattr(msg, "additional_kwargs", {}) or {})
         raw_tool_calls = additional_kwargs.get("tool_calls")
         if isinstance(raw_tool_calls, list):
+            raw_changed = False
             sanitized_raw_tool_calls = []
             for raw_tool_call in raw_tool_calls:
                 if not isinstance(raw_tool_call, dict):
@@ -192,17 +199,18 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
                     if sanitized_function.get("name") != normalized_name:
                         sanitized_function["name"] = normalized_name
                         sanitized_raw["function"] = sanitized_function
-                        changed = True
+                        raw_changed = True
                 else:
                     normalized_name = _normalize_tool_name(sanitized_raw.get("name"))
                     if sanitized_raw.get("name") != normalized_name:
                         sanitized_raw["name"] = normalized_name
-                        changed = True
+                        raw_changed = True
                 sanitized_raw_tool_calls.append(sanitized_raw)
 
-            if changed:
+            if raw_changed:
                 additional_kwargs["tool_calls"] = sanitized_raw_tool_calls
                 update["additional_kwargs"] = additional_kwargs
+                changed = True
 
         if not changed:
             return msg
@@ -239,6 +247,8 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
             if getattr(msg, "type", None) != "ai":
                 continue
 
+            # Intentionally inspect the original message so empty names can be
+            # classified before the sanitized message replaces them.
             for tc in self._message_tool_calls(msg):
                 tc_id = tc.get("id")
                 if not tc_id:
