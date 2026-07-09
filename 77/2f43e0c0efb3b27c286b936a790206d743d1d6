@@ -1,0 +1,23 @@
+backend/packages/harness/deerflow/runtime/stream_bridge/redis.py
+  s_b8f5464686e061::t_25f0a68cd78248 36,175-178
+backend/tests/test_stream_bridge.py
+  s_b8f5464686e061::t_8c7e2d6e7d4af8 513-555
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "772f43e0c0efb3b27c286b936a790206d743d1d6",
+  "prompts": {},
+  "sessions": {
+    "s_b8f5464686e061": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f45e2-2b3d-7580-9ce4-7ee70327827e",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
