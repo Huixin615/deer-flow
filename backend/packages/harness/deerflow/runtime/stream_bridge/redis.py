@@ -164,13 +164,16 @@ class RedisStreamBridge(StreamBridge):
         """Return whether Redis still has retained stream data for *run_id*."""
         return bool(await self._redis.exists(self._stream_key(run_id)))
 
-    @staticmethod
-    def _resolve_start_stream_id(last_event_id: str | None) -> str:
+    async def _resolve_start_stream_id(self, key: str, last_event_id: str | None) -> str:
         if last_event_id is None:
             return "0-0"
         if _REDIS_STREAM_ID_RE.fullmatch(last_event_id):
             return last_event_id
-        return "$"
+        entries = await self._redis.xrevrange(key, count=1)
+        if not entries:
+            return "0-0"
+        event_id, _fields = entries[0]
+        return self._decode(event_id)
 
     async def subscribe(
         self,
@@ -180,7 +183,7 @@ class RedisStreamBridge(StreamBridge):
         heartbeat_interval: float = 15.0,
     ) -> AsyncIterator[StreamEvent]:
         key = self._stream_key(run_id)
-        stream_id = self._resolve_start_stream_id(last_event_id)
+        stream_id = await self._resolve_start_stream_id(key, last_event_id)
         block_ms = max(1, int(heartbeat_interval * 1000)) if heartbeat_interval > 0 else 1
         consecutive_errors = 0
 

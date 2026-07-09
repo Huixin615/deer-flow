@@ -60,6 +60,10 @@ class _FakeRedis:
                 except TimeoutError:
                     return []
 
+    async def xrevrange(self, name, max="+", min="-", count=None):
+        entries = list(reversed(self.streams.get(name, [])))
+        return entries[:count] if count is not None else entries
+
     async def delete(self, name):
         self.deleted.append(name)
         self.streams.pop(name, None)
