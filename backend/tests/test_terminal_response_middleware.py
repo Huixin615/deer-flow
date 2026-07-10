@@ -59,6 +59,10 @@ def _agent(model: BaseChatModel):
     )
 
 
+def _empty_terminal_messages(messages: list[Any]) -> list[AIMessage]:
+    return [message for message in messages if isinstance(message, AIMessage) and not message.tool_calls and not message.invalid_tool_calls and not str(message.content).strip()]
+
+
 def test_retries_empty_post_tool_response_once_and_returns_model_answer():
     model = _PostToolResponseModel(responses=["", "The tool completed successfully."])
 
@@ -71,6 +75,7 @@ def test_retries_empty_post_tool_response_once_and_returns_model_answer():
     final = result["messages"][-1]
     assert isinstance(final, AIMessage)
     assert final.content == "The tool completed successfully."
+    assert _empty_terminal_messages(result["messages"]) == []
     assert any(isinstance(message, HumanMessage) and message.name == "terminal_response_recovery" and message.additional_kwargs.get("hide_from_ui") is True for message in model.observed_messages[-1])
     assert not any(isinstance(message, HumanMessage) and message.name == "terminal_response_recovery" for message in result["messages"])
 
@@ -89,6 +94,7 @@ def test_second_empty_post_tool_response_becomes_visible_error_fallback():
     assert "returned no final response" in str(final.content)
     assert final.additional_kwargs["deerflow_error_fallback"] is True
     assert final.additional_kwargs["empty_terminal_response"] is True
+    assert _empty_terminal_messages(result["messages"]) == []
     assert _extract_llm_error_fallback_message(result) == ("Model returned an empty terminal response after one retry")
 
 
@@ -103,6 +109,7 @@ async def test_async_graph_retries_empty_post_tool_response_once():
 
     assert model.call_count == 3
     assert result["messages"][-1].content == "Recovered asynchronously."
+    assert _empty_terminal_messages(result["messages"]) == []
 
 
 def test_empty_response_without_tool_result_is_not_retried():
@@ -154,6 +161,40 @@ def test_after_agent_clears_retry_state_for_the_run():
         ]
     }
 
-    assert middleware.after_model(empty_after_tool, runtime) == {"jump_to": "model"}
+    first = middleware.after_model(empty_after_tool, runtime)
+    assert first is not None and first["jump_to"] == "model"
     middleware.after_agent(empty_after_tool, runtime)
-    assert middleware.after_model(empty_after_tool, runtime) == {"jump_to": "model"}
+    second = middleware.after_model(empty_after_tool, runtime)
+    assert second is not None and second["jump_to"] == "model"
+
+
+def test_before_agent_clears_same_run_state_for_resumed_invocation():
+    middleware = TerminalResponseMiddleware()
+    runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-7", "run_id": "run-7"}})()
+    empty_after_tool = {
+        "messages": [
+            HumanMessage(content="Check the status"),
+            ToolMessage(content="tool completed", tool_call_id="call-7"),
+            AIMessage(content="", response_metadata={"finish_reason": "stop"}),
+        ]
+    }
+
+    first = middleware.after_model(empty_after_tool, runtime)
+    assert first is not None and first["jump_to"] == "model"
+    middleware.before_agent(empty_after_tool, runtime)
+    resumed = middleware.after_model(empty_after_tool, runtime)
+    assert resumed is not None and resumed["jump_to"] == "model"
+
+
+def test_tool_history_without_real_user_message_does_not_trigger_recovery():
+    middleware = TerminalResponseMiddleware()
+    runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-8", "run_id": "run-8"}})()
+    state = {
+        "messages": [
+            HumanMessage(content="internal", additional_kwargs={"hide_from_ui": True}),
+            ToolMessage(content="tool completed", tool_call_id="call-8"),
+            AIMessage(content="", response_metadata={"finish_reason": "stop"}),
+        ]
+    }
+
+    assert middleware.after_model(state, runtime) is None

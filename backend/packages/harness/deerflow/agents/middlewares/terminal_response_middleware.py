@@ -9,7 +9,7 @@ from typing import Any, override
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelCallResult, ModelRequest, ModelResponse, hook_config
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langgraph.runtime import Runtime
 
 _RECOVERY_PROMPT = (
@@ -61,6 +61,10 @@ def _tool_result_in_current_turn(messages: list[Any]) -> bool:
         if (message.additional_kwargs or {}).get("hide_from_ui"):
             continue
         latest_user_index = index
+    # This guard intentionally covers the post-tool regression from #4027,
+    # not context-less graph invocations or every possible empty completion.
+    if latest_user_index == -1:
+        return False
     return any(isinstance(message, ToolMessage) for message in messages[latest_user_index + 1 :])
 
 
@@ -80,6 +84,8 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
             thread_id = str(context.get("thread_id") or "unknown-thread")
             run_id = str(context.get("run_id") or context.get("run_attempt_id") or id(runtime))
             return thread_id, run_id
+        # Defensive fallback for tests/custom embeddings. Production Gateway
+        # runs always provide thread_id and run_id in Runtime.context.
         return "unknown-thread", str(id(runtime))
 
     def _clear(self, runtime: Runtime) -> None:
@@ -109,13 +115,20 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
         key = self._key(runtime)
         with self._lock:
+            # The recovery budget is once per run, not once per empty message.
+            # A retry that calls another tool must not refresh the budget and
+            # create an unbounded empty -> retry -> tool loop.
             retry_count = self._retry_counts.get(key, 0)
             if retry_count == 0:
                 self._retry_counts[key] = 1
                 self._pending_prompts.add(key)
 
         if retry_count == 0:
-            return {"jump_to": "model"}
+            # The next model call gets a new message id. Remove this empty
+            # terminal message now so a successful recovery does not leave it
+            # in checkpoint history or future model context.
+            message_updates = [RemoveMessage(id=last.id)] if last.id else []
+            return {"messages": message_updates, "jump_to": "model"}
 
         additional_kwargs = dict(last.additional_kwargs or {})
         additional_kwargs.update(
@@ -150,11 +163,16 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
         self._clear_other_runs(runtime)
+        # A prior invocation can bypass after_agent via Command(goto=END).
+        # Reset the same run id here so resume starts with a fresh one-retry
+        # budget; internal jump_to=model loops do not re-run before_agent.
+        self._clear(runtime)
         return None
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
         self._clear_other_runs(runtime)
+        self._clear(runtime)
         return None
 
     @hook_config(can_jump_to=["model"])
