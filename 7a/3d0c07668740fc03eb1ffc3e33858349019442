@@ -1,0 +1,23 @@
+backend/packages/harness/deerflow/agents/middlewares/terminal_response_middleware.py
+  s_fa165e5949cfd5::t_87fc707df7c223 12,64-67,87-88,118-120,127-131,166-169,175
+backend/tests/test_terminal_response_middleware.py
+  s_fa165e5949cfd5::t_fba5b2d119f25b 62-65,78,97,112,164-165,167-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "7a3d0c07668740fc03eb1ffc3e33858349019442",
+  "prompts": {},
+  "sessions": {
+    "s_fa165e5949cfd5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4a97-6b56-7131-8e6d-b5324f4846c0",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
