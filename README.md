@@ -615,6 +615,10 @@ Use it as-is. Or tear it apart and make it yours.
 
 ## Core Features
 
+Tool-using runs are guarded against empty provider completions: DeerFlow retries
+an empty final response once, then surfaces a visible error instead of reporting
+a silent successful run.
+
 ### Skills & Tools
 
 Skills are what make DeerFlow do *almost anything*.
