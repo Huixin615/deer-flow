@@ -1,0 +1,31 @@
+README.md
+  s_fa165e5949cfd5::t_ea829890dbd43d 615-618
+backend/AGENTS.md
+  s_fa165e5949cfd5::t_576fecc8364dd5 249-252
+backend/packages/harness/deerflow/agents/lead_agent/agent.py
+  s_fa165e5949cfd5::t_aa4530f942c65f 37,395-399,401-404
+backend/packages/harness/deerflow/agents/middlewares/terminal_response_middleware.py
+  s_fa165e5949cfd5::t_eb612f8a01d32a 1-194
+backend/tests/test_lead_agent_model_resolution.py
+  s_fa165e5949cfd5::t_57b54c0b80a3a6 375-385
+backend/tests/test_terminal_response_middleware.py
+  s_fa165e5949cfd5::t_06c892d616c7bb 1-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "84c490b1dfe783c8451c383f31eb28c5e9524f63",
+  "prompts": {},
+  "sessions": {
+    "s_fa165e5949cfd5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4a97-6b56-7131-8e6d-b5324f4846c0",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
