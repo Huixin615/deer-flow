@@ -1,0 +1,37 @@
+README.md
+  s_34756b16e58910::t_c08ea35c0ff5c1 626-627,630-631
+backend/AGENTS.md
+  s_34756b16e58910::t_451aee29bbb449 239-256,446-447
+backend/packages/harness/deerflow/agents/lead_agent/agent.py
+  s_34756b16e58910::t_a048f141051d72 282-287,405,411,510,523,530,572,594
+backend/packages/harness/deerflow/skills/storage/local_skill_storage.py
+  s_34756b16e58910::t_49836f3dca7b9b 86-91
+backend/packages/harness/deerflow/skills/storage/user_scoped_skill_storage.py
+  s_34756b16e58910::t_9f2ac41dfc6ed8 271,282,298
+backend/tests/test_lead_agent_skills.py
+  s_34756b16e58910::t_78558a554311ad 238,284-285,298,325,339,366,425,461
+backend/tests/test_skills_bundled.py
+  s_34756b16e58910::t_9a842b0f0eaf98 14,36-43
+backend/tests/test_skills_loader.py
+  s_34756b16e58910::t_9bcae19601c7de 66-81
+backend/tests/test_user_scoped_skill_storage.py
+  s_34756b16e58910::t_33635b3339648d 139-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "fdb72419304c420ba96ed9e6b5d3efdb7c983a28",
+  "prompts": {},
+  "sessions": {
+    "s_34756b16e58910": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5315-e064-7022-a2a6-5587ff78e775",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
