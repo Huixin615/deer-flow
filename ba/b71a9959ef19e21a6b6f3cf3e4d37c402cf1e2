@@ -1,0 +1,23 @@
+frontend/src/components/workspace/messages/markdown-content.tsx
+  s_542b63c3114838::t_6e7a514bebfec4 3,11,24-79,99,103-110
+frontend/tests/unit/components/workspace/messages/markdown-content.test.ts
+  s_542b63c3114838::t_36b42bbdb60392 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "bab71a9959ef19e21a6b6f3cf3e4d37c402cf1e2",
+  "prompts": {},
+  "sessions": {
+    "s_542b63c3114838": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f508d-4dc9-7bf1-aff4-5a418a3d546f",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
