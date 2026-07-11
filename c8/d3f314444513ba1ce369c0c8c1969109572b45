@@ -1,0 +1,25 @@
+frontend/src/components/workspace/messages/message-list.tsx
+  s_d3a466c0835000::t_f24c471ee91839 694-695,736
+frontend/src/core/artifacts/utils.ts
+  s_d3a466c0835000::t_27c94f3972b94e 5-6,30
+frontend/tests/unit/core/artifacts/utils.test.ts
+  s_d3a466c0835000::t_4bb30e8463727f 77-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "c8d3f314444513ba1ce369c0c8c1969109572b45",
+  "prompts": {},
+  "sessions": {
+    "s_d3a466c0835000": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5201-db59-7811-8816-f50d2897b6bf",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
