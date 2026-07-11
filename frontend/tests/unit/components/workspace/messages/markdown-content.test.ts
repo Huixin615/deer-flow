@@ -36,6 +36,13 @@ describe("MarkdownContent streaming code blocks", () => {
     expect(html).not.toContain("data-streaming-code-block");
   });
 
+  it("keeps an unlabeled single-line fence as a block while streaming", () => {
+    const html = renderMarkdown(["```", "x", "```"].join("\n"), true);
+
+    expect(html).toContain("data-streaming-code-block");
+    expect(html).not.toContain('data-streaming-inline-code="true"');
+  });
+
   it("restores Streamdown highlighting after streaming finishes", () => {
     const html = renderMarkdown(
       ["```html", '<main class="report">Hello</main>', "```"].join("\n"),
@@ -60,5 +67,19 @@ describe("MarkdownContent streaming code blocks", () => {
 
     expect(html).toContain('data-custom-link="true"');
     expect(html).toContain('data-custom-image="true"');
+  });
+
+  it("preserves a caller-provided code renderer while streaming", () => {
+    const html = renderMarkdown(
+      ["```html", "<main />", "```"].join("\n"),
+      true,
+      {
+        code: ({ children }) =>
+          createElement("code", { "data-custom-code": true }, children),
+      },
+    );
+
+    expect(html).toContain('data-custom-code="true"');
+    expect(html).toContain("data-streaming-code-block");
   });
 });
