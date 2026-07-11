@@ -615,10 +615,6 @@ Use it as-is. Or tear it apart and make it yours.
 
 ## Core Features
 
-Tool-using runs are guarded against empty provider completions: DeerFlow retries
-an empty final response once, then surfaces a visible error instead of reporting
-a silent successful run.
-
 ### Skills & Tools
 
 Skills are what make DeerFlow do *almost anything*.
@@ -740,6 +736,8 @@ This is the difference between a chatbot with tool access and an agent with an a
 **Summarization**: Within a session, DeerFlow manages context aggressively — summarizing completed sub-tasks, offloading intermediate results to the filesystem, compressing what's no longer immediately relevant. This lets it stay sharp across long, multi-step tasks without blowing the context window.
 
 **Strict Tool-Call Recovery**: When a provider or middleware interrupts a tool-call loop, DeerFlow now strips provider-level raw tool-call metadata on forced-stop assistant messages and injects placeholder tool results for dangling calls before the next model invocation. This keeps OpenAI-compatible reasoning models that strictly validate `tool_call_id` sequences from failing with malformed history errors.
+
+**Visible Tool-Run Completion**: For interactive turns, DeerFlow retries an empty post-tool final response once, then surfaces a visible error instead of reporting a silent successful run.
 
 ### Long-Term Memory
 

@@ -12,6 +12,8 @@ from langchain.agents.middleware.types import ModelCallResult, ModelRequest, Mod
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langgraph.runtime import Runtime
 
+from deerflow.agents.middlewares._bounded_dict import BoundedDict
+
 _RECOVERY_PROMPT = (
     "<system_reminder>\n"
     "Your previous response after the tool execution was empty. Review the tool results "
@@ -61,8 +63,9 @@ def _tool_result_in_current_turn(messages: list[Any]) -> bool:
         if (message.additional_kwargs or {}).get("hide_from_ui"):
             continue
         latest_user_index = index
-    # This guard intentionally covers the post-tool regression from #4027,
-    # not context-less graph invocations or every possible empty completion.
+    # Scope: #4027 covers interactive post-tool turns. Scheduled/internal
+    # invocations without a real HumanMessage need a separate terminal-success
+    # invariant rather than being inferred from arbitrary historical tools.
     if latest_user_index == -1:
         return False
     return any(isinstance(message, ToolMessage) for message in messages[latest_user_index + 1 :])
@@ -74,8 +77,8 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
     def __init__(self) -> None:
         super().__init__()
         self._lock = threading.Lock()
-        self._retry_counts: dict[tuple[str, str], int] = {}
-        self._pending_prompts: set[tuple[str, str]] = set()
+        self._retry_counts: BoundedDict[tuple[str, str], int] = BoundedDict(1000)
+        self._pending_prompts: BoundedDict[tuple[str, str], bool] = BoundedDict(1000)
 
     @staticmethod
     def _key(runtime: Runtime) -> tuple[str, str]:
@@ -92,7 +95,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         key = self._key(runtime)
         with self._lock:
             self._retry_counts.pop(key, None)
-            self._pending_prompts.discard(key)
+            self._pending_prompts.pop(key, None)
 
     def _clear_other_runs(self, runtime: Runtime) -> None:
         thread_id, run_id = self._key(runtime)
@@ -100,7 +103,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
             stale = [key for key in self._retry_counts if key[0] == thread_id and key[1] != run_id]
             for key in stale:
                 self._retry_counts.pop(key, None)
-                self._pending_prompts.discard(key)
+                self._pending_prompts.pop(key, None)
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
         messages = list(state.get("messages") or [])
@@ -121,7 +124,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
             retry_count = self._retry_counts.get(key, 0)
             if retry_count == 0:
                 self._retry_counts[key] = 1
-                self._pending_prompts.add(key)
+                self._pending_prompts[key] = True
 
         if retry_count == 0:
             # The next model call gets a new message id. Remove this empty
@@ -135,7 +138,6 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
             {
                 "deerflow_error_fallback": True,
                 "error_reason": "Model returned an empty terminal response after one retry",
-                "empty_terminal_response": True,
             }
         )
         fallback = last.model_copy(
@@ -150,7 +152,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         key = self._key(request.runtime)
         with self._lock:
             pending = key in self._pending_prompts
-            self._pending_prompts.discard(key)
+            self._pending_prompts.pop(key, None)
         if not pending:
             return request
         reminder = HumanMessage(

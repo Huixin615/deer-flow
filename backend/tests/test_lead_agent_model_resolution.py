@@ -372,7 +372,7 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
 
     assert any(isinstance(m, lead_agent_module.ViewImageMiddleware) for m in middlewares)
     # verify the custom middleware is injected correctly.
-    # Chain tail order after the custom middleware is:
+    # With this test's default safety config enabled, the tail order is:
     #   ..., custom, TerminalResponseMiddleware, SafetyFinishReasonMiddleware,
     #   ClarificationMiddleware, so the custom mock sits at index [-4].
     assert len(middlewares) > 0 and isinstance(middlewares[-4], MagicMock)
