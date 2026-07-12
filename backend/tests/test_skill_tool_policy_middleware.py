@@ -234,14 +234,35 @@ def test_async_unauthorized_tool_execution_is_blocked():
     assert result.name == "task"
 
 
-def test_unknown_skill_context_path_fails_closed():
-    middleware = _middleware([_skill("restricted", ["web_search"])])
+def test_unknown_skill_context_path_is_skipped_while_resolvable_skills_apply():
+    restricted = _skill("restricted", ["web_search"])
+    middleware = _middleware([restricted])
     request = ModelRequestStub(
-        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
-        state={"skill_context": [{"path": "/mnt/skills/public/missing/SKILL.md"}]},
+        [NamedTool("task"), NamedTool("read_file"), NamedTool("web_search")],
+        state={
+            "skill_context": [
+                {"path": "/mnt/skills/public/missing/SKILL.md"},
+                {"path": restricted.get_container_file_path()},
+            ]
+        },
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "web_search"]
+
+
+def test_async_passive_tool_call_skips_storage_and_thread_offload():
+    middleware = _middleware([])
+
+    def fail_storage():
+        raise AssertionError("passive tool calls must not load skill storage")
+
+    middleware._storage = fail_storage
+    request = ToolRequestStub("task")
+
+    async def handler(_):
+        return "executed"
+
+    assert asyncio.run(middleware.awrap_tool_call(request, handler)) == "executed"
 
 
 def test_active_policy_load_failure_fails_closed_to_framework_tools():

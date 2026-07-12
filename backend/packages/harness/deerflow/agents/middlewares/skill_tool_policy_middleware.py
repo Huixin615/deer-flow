@@ -17,12 +17,12 @@ from langgraph.types import Command
 
 from deerflow.runtime.secret_context import _SLASH_SECRET_SOURCE_KEY
 from deerflow.skills.storage import get_or_new_skill_storage, get_or_new_user_skill_storage
-from deerflow.skills.storage.skill_storage import SkillStorage
 from deerflow.skills.tool_policy import ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES, allowed_tool_names_for_skills
 from deerflow.skills.types import Skill
 
 if TYPE_CHECKING:
     from deerflow.config.app_config import AppConfig
+    from deerflow.skills.storage.skill_storage import SkillStorage
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             skill = registry.get(posixpath.normpath(path))
             if skill is None:
                 logger.warning("Active skill path could not be resolved for allowed-tools policy: %s", path)
-                return [], True
+                continue
             if not skill.enabled or (self._available_skills is not None and skill.name not in self._available_skills):
                 continue
             if skill.name in seen:
@@ -168,6 +168,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
+        if not self._active_paths(request):
+            return await handler(request)
         blocked = await asyncio.to_thread(self._blocked_tool_message, request)
         if blocked is not None:
             return blocked
