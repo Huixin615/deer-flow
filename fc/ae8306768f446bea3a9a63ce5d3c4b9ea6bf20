@@ -1,0 +1,23 @@
+backend/AGENTS.md
+  s_34756b16e58910::t_c0ff268d4e5e48 239
+backend/packages/harness/deerflow/agents/middlewares/skill_tool_policy_middleware.py
+  s_34756b16e58910::t_7d3ccfef17cb2e 9,30-37,85,115-116,124-155,181-182,190-192,194-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "fcae8306768f446bea3a9a63ce5d3c4b9ea6bf20",
+  "prompts": {},
+  "sessions": {
+    "s_34756b16e58910": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5315-e064-7022-a2a6-5587ff78e775",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
