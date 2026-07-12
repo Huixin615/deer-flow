@@ -83,6 +83,33 @@ def test_passive_enabled_skill_does_not_filter_lead_tools():
     assert _tool_names(filtered) == ["task", "web_search", "review_skill_package"]
 
 
+def test_sync_passive_model_call_skips_storage():
+    middleware = _middleware([])
+
+    def fail_storage():
+        raise AssertionError("passive model calls must not load skill storage")
+
+    middleware._storage = fail_storage
+    request = ModelRequestStub([NamedTool("task")])
+
+    assert middleware.wrap_model_call(request, lambda model_request: model_request) is request
+
+
+def test_async_passive_model_call_skips_storage_and_thread_offload():
+    middleware = _middleware([])
+
+    def fail_storage():
+        raise AssertionError("passive model calls must not load skill storage")
+
+    middleware._storage = fail_storage
+    request = ModelRequestStub([NamedTool("task")])
+
+    async def handler(model_request):
+        return model_request
+
+    assert asyncio.run(middleware.awrap_model_call(request, handler)) is request
+
+
 def test_slash_activated_skill_filters_first_model_call_and_task():
     skill = _skill("reviewer", ["review_skill_package"])
     context = {_SLASH_SECRET_SOURCE_KEY: {"path": skill.get_container_file_path()}}

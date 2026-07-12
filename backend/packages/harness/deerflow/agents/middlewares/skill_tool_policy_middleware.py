@@ -148,6 +148,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        if not self._active_paths(request):
+            return await handler(request)
         filtered = await asyncio.to_thread(self._filter_model_request, request)
         return await handler(filtered)
 
