@@ -1,8 +1,13 @@
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+from langchain.agents.middleware.types import ModelRequest
+from langchain.tools import ToolRuntime
 from langchain_core.messages import HumanMessage
+from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.runtime import Runtime
 
 from deerflow.runtime.secret_context import _SLASH_SECRET_SOURCE_KEY
 from deerflow.skills.types import Skill, SkillCategory
@@ -17,7 +22,7 @@ class ModelRequestStub:
     def __init__(self, tools, *, state=None, context=None, messages=None):
         self.tools = tools
         self.state = state or {}
-        self.runtime = SimpleNamespace(context=context or {})
+        self.runtime = SimpleNamespace(context={} if context is None else context)
         self.messages = messages or []
 
     def override(self, **updates):
@@ -33,14 +38,16 @@ class ToolRequestStub:
     def __init__(self, name: str, *, state=None, context=None):
         self.tool_call = {"name": name, "id": "call-1", "args": {}}
         self.state = state or {}
-        self.runtime = SimpleNamespace(context=context or {})
+        self.runtime = SimpleNamespace(context={} if context is None else context)
 
 
 class StorageStub:
     def __init__(self, skills):
         self._skills = skills
+        self.load_calls = 0
 
     def load_skills(self, *, enabled_only=False):
+        self.load_calls += 1
         return [skill for skill in self._skills if skill.enabled or not enabled_only]
 
     def get_container_root(self):
@@ -290,6 +297,131 @@ def test_async_passive_tool_call_skips_storage_and_thread_offload():
         return "executed"
 
     assert asyncio.run(middleware.awrap_tool_call(request, handler)) == "executed"
+
+
+def test_tool_calls_reuse_the_current_model_step_policy_decision():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    state = {"skill_context": [{"path": restricted.get_container_file_path()}]}
+    model_request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("web_search")],
+        state=state,
+        context=context,
+    )
+
+    filtered = middleware.wrap_model_call(model_request, lambda request: request)
+    assert _tool_names(filtered) == ["web_search"]
+
+    for _ in range(3):
+        tool_request = ToolRequestStub("web_search", state=state, context=context)
+        assert middleware.wrap_tool_call(tool_request, lambda _: "executed") == "executed"
+
+    assert storage.load_calls == 1
+
+
+def test_async_tool_calls_reuse_the_current_model_step_policy_decision():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    state = {"skill_context": [{"path": restricted.get_container_file_path()}]}
+    model_request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("web_search")],
+        state=state,
+        context=context,
+    )
+
+    async def go():
+        filtered = await middleware.awrap_model_call(model_request, lambda request: asyncio.sleep(0, result=request))
+        assert _tool_names(filtered) == ["web_search"]
+
+        async def execute(_):
+            return "executed"
+
+        results = await asyncio.gather(*(middleware.awrap_tool_call(ToolRequestStub("web_search", state=state, context=context), execute) for _ in range(3)))
+        assert results == ["executed", "executed", "executed"]
+
+    asyncio.run(go())
+    assert storage.load_calls == 1
+
+
+def test_real_model_and_tool_requests_share_the_model_step_policy_decision():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    state = {
+        "messages": [],
+        "skill_context": [{"path": restricted.get_container_file_path()}],
+    }
+    model_request = ModelRequest(
+        model=MagicMock(),
+        messages=[],
+        tools=[NamedTool("task"), NamedTool("web_search")],
+        state=state,
+        runtime=Runtime(context=context),
+    )
+
+    filtered = middleware.wrap_model_call(model_request, lambda request: request)
+    assert _tool_names(filtered) == ["web_search"]
+
+    tool_runtime = ToolRuntime(
+        state=state,
+        context=context,
+        config={},
+        stream_writer=lambda _: None,
+        tools=[],
+        tool_call_id="call-1",
+        store=None,
+    )
+    tool_request = ToolCallRequest(
+        tool_call={"name": "web_search", "args": {}, "id": "call-1", "type": "tool_call"},
+        tool=None,
+        state=state,
+        runtime=tool_runtime,
+    )
+
+    assert middleware.wrap_tool_call(tool_request, lambda _: "executed") == "executed"
+    assert storage.load_calls == 1
+
+
+def test_next_model_call_refreshes_the_policy_decision():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    state = {"skill_context": [{"path": restricted.get_container_file_path()}]}
+
+    first = ModelRequestStub([NamedTool("bash"), NamedTool("web_search")], state=state, context=context)
+    assert _tool_names(middleware.wrap_model_call(first, lambda request: request)) == ["web_search"]
+
+    storage._skills = [_skill("restricted", ["bash"])]
+    second = ModelRequestStub([NamedTool("bash"), NamedTool("web_search")], state=state, context=context)
+    assert _tool_names(middleware.wrap_model_call(second, lambda request: request)) == ["bash"]
+    assert storage.load_calls == 2
+
+
+def test_tool_call_without_matching_model_decision_revalidates_registry():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    request = ToolRequestStub(
+        "task",
+        state={"skill_context": [{"path": restricted.get_container_file_path()}]},
+        context={},
+    )
+
+    result = middleware.wrap_tool_call(request, lambda _: "executed")
+
+    assert result.status == "error"
+    assert storage.load_calls == 1
 
 
 def test_active_policy_load_failure_fails_closed_to_framework_tools():

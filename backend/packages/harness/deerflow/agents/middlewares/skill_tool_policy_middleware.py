@@ -6,6 +6,7 @@ import asyncio
 import logging
 import posixpath
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from langchain.agents import AgentState
@@ -25,6 +26,14 @@ if TYPE_CHECKING:
     from deerflow.skills.storage.skill_storage import SkillStorage
 
 logger = logging.getLogger(__name__)
+
+_POLICY_DECISION_CONTEXT_KEY = "__skill_tool_policy_decision"
+
+
+@dataclass(frozen=True, slots=True)
+class _PolicyDecision:
+    active_paths: tuple[str, ...]
+    allowed_names: frozenset[str] | None
 
 
 class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
@@ -73,8 +82,7 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
                 paths.append(entry["path"])
         return paths
 
-    def _active_skills(self, request: ModelRequest | ToolCallRequest) -> tuple[list[Skill], bool]:
-        paths = self._active_paths(request)
+    def _active_skills_for_paths(self, paths: tuple[str, ...]) -> tuple[list[Skill], bool]:
         if not paths:
             return [], False
 
@@ -104,8 +112,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             active.append(skill)
         return active, False
 
-    def _allowed_names(self, request: ModelRequest | ToolCallRequest) -> set[str] | None:
-        active_skills, policy_failed = self._active_skills(request)
+    def _allowed_names_for_paths(self, paths: tuple[str, ...]) -> set[str] | None:
+        active_skills, policy_failed = self._active_skills_for_paths(paths)
         if policy_failed:
             return set(ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES)
         allowed = allowed_tool_names_for_skills(active_skills)
@@ -113,8 +121,38 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             return None
         return allowed | set(ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES)
 
-    def _filter_model_request(self, request: ModelRequest) -> ModelRequest:
-        allowed = self._allowed_names(request)
+    @staticmethod
+    def _runtime_context(request: ModelRequest | ToolCallRequest) -> dict | None:
+        context = getattr(getattr(request, "runtime", None), "context", None)
+        return context if isinstance(context, dict) else None
+
+    def _store_policy_decision(self, request: ModelRequest, paths: tuple[str, ...], allowed: set[str] | None) -> None:
+        context = self._runtime_context(request)
+        if context is not None:
+            context[_POLICY_DECISION_CONTEXT_KEY] = _PolicyDecision(
+                active_paths=paths,
+                allowed_names=None if allowed is None else frozenset(allowed),
+            )
+
+    def _allowed_names(self, request: ModelRequest | ToolCallRequest) -> set[str] | None:
+        paths = tuple(self._active_paths(request))
+        context = self._runtime_context(request)
+        decision = context.get(_POLICY_DECISION_CONTEXT_KEY) if context is not None else None
+        if isinstance(decision, _PolicyDecision) and decision.active_paths == paths:
+            return None if decision.allowed_names is None else set(decision.allowed_names)
+        return self._allowed_names_for_paths(paths)
+
+    def _filter_model_request(
+        self,
+        request: ModelRequest,
+        *,
+        paths: tuple[str, ...] | None = None,
+        refresh_decision: bool = False,
+    ) -> ModelRequest:
+        resolved_paths = tuple(self._active_paths(request)) if paths is None else paths
+        allowed = self._allowed_names_for_paths(resolved_paths) if refresh_decision else self._allowed_names(request)
+        if refresh_decision:
+            self._store_policy_decision(request, resolved_paths, allowed)
         if allowed is None:
             return request
         tools = [tool for tool in request.tools if getattr(tool, "name", None) in allowed]
@@ -140,7 +178,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        return handler(self._filter_model_request(request))
+        paths = tuple(self._active_paths(request))
+        return handler(self._filter_model_request(request, paths=paths, refresh_decision=True))
 
     @override
     async def awrap_model_call(
@@ -148,9 +187,16 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        if not self._active_paths(request):
+        paths = tuple(self._active_paths(request))
+        if not paths:
+            self._store_policy_decision(request, paths, None)
             return await handler(request)
-        filtered = await asyncio.to_thread(self._filter_model_request, request)
+        filtered = await asyncio.to_thread(
+            self._filter_model_request,
+            request,
+            paths=paths,
+            refresh_decision=True,
+        )
         return await handler(filtered)
 
     @override
