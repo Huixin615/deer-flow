@@ -434,6 +434,28 @@ def test_build_middlewares_passes_explicit_app_config_to_shared_factory(monkeypa
     assert middlewares[0] == "base-middleware"
 
 
+def test_build_middlewares_orders_skill_activation_before_policy_and_durable_context(monkeypatch):
+    from deerflow.agents.middlewares.durable_context_middleware import DurableContextMiddleware
+    from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
+    from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
+
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+    monkeypatch.setattr(lead_agent_module, "build_lead_runtime_middlewares", lambda *, app_config, lazy_init=True: [])
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda *, app_config=None: None)
+    monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
+
+    middlewares = lead_agent_module.build_middlewares(
+        {"configurable": {"is_plan_mode": False, "subagent_enabled": False}},
+        model_name="safe-model",
+        app_config=app_config,
+    )
+
+    activation_idx = next(i for i, middleware in enumerate(middlewares) if isinstance(middleware, SkillActivationMiddleware))
+    policy_idx = next(i for i, middleware in enumerate(middlewares) if isinstance(middleware, SkillToolPolicyMiddleware))
+    durable_idx = next(i for i, middleware in enumerate(middlewares) if isinstance(middleware, DurableContextMiddleware))
+    assert activation_idx < policy_idx < durable_idx
+
+
 def test_build_middlewares_places_mcp_routing_before_deferred_filter(monkeypatch):
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
     from deerflow.agents.middlewares.mcp_routing_middleware import McpRoutingMiddleware

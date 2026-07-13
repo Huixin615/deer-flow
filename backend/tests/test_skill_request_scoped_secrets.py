@@ -385,6 +385,23 @@ class TestSecretCarrier:
         assert extract_request_secrets({"secrets": "not-a-dict"}) == {}
         assert extract_request_secrets(None) == {}
 
+    def test_slash_skill_source_path_public_contract(self):
+        from deerflow.runtime.secret_context import read_slash_skill_source_path, write_slash_skill_source_path
+
+        context = {}
+        write_slash_skill_source_path(context, "/mnt/skills/public/reviewer/SKILL.md")
+
+        assert read_slash_skill_source_path(context) == "/mnt/skills/public/reviewer/SKILL.md"
+
+    def test_slash_skill_source_path_rejects_malformed_shapes(self):
+        from deerflow.runtime.secret_context import read_slash_skill_source_path
+
+        malformed = [None, "path", [], {"path": None}, {"path": ""}, {"path": 7}]
+        for value in malformed:
+            assert read_slash_skill_source_path({"__slash_skill_secret_source": value}) is None
+        assert read_slash_skill_source_path({}) is None
+        assert read_slash_skill_source_path(None) is None
+
 
 def _make_secret_skill(tmp_path: Path, name: str, required_secrets, *, enabled: bool = True, secrets_autonomous: bool = True):
     skill_dir = tmp_path / name

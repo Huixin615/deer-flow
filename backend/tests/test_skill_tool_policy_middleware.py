@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -9,7 +10,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 
-from deerflow.runtime.secret_context import _SLASH_SECRET_SOURCE_KEY
+from deerflow.runtime.secret_context import write_slash_skill_source_path
 from deerflow.skills.types import Skill, SkillCategory
 
 
@@ -119,7 +120,8 @@ def test_async_passive_model_call_skips_storage_and_thread_offload():
 
 def test_slash_activated_skill_filters_first_model_call_and_task():
     skill = _skill("reviewer", ["review_skill_package"])
-    context = {_SLASH_SECRET_SOURCE_KEY: {"path": skill.get_container_file_path()}}
+    context = {}
+    write_slash_skill_source_path(context, skill.get_container_file_path())
     middleware = _middleware([skill])
     request = ModelRequestStub(
         [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
@@ -299,6 +301,15 @@ def test_async_passive_tool_call_skips_storage_and_thread_offload():
     assert asyncio.run(middleware.awrap_tool_call(request, handler)) == "executed"
 
 
+def test_sync_passive_tool_call_skips_policy_resolution():
+    middleware = _middleware([])
+    request = ToolRequestStub("task")
+    middleware._blocked_tool_message = MagicMock(side_effect=AssertionError("passive tool calls must bypass policy resolution"))
+
+    assert middleware.wrap_tool_call(request, lambda _: "executed") == "executed"
+    middleware._blocked_tool_message.assert_not_called()
+
+
 def test_tool_calls_reuse_the_current_model_step_policy_decision():
     restricted = _skill("restricted", ["web_search"])
     storage = StorageStub([restricted])
@@ -388,6 +399,104 @@ def test_real_model_and_tool_requests_share_the_model_step_policy_decision():
 
     assert middleware.wrap_tool_call(tool_request, lambda _: "executed") == "executed"
     assert storage.load_calls == 1
+
+
+def test_policy_decision_is_json_safe_and_survives_round_trip():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    state = {"skill_context": [{"path": restricted.get_container_file_path()}]}
+    context = {}
+    model_request = ModelRequestStub([NamedTool("web_search")], state=state, context=context)
+
+    middleware.wrap_model_call(model_request, lambda request: request)
+    round_tripped = json.loads(json.dumps(context))
+    tool_request = ToolRequestStub("web_search", state=state, context=round_tripped)
+
+    assert middleware.wrap_tool_call(tool_request, lambda _: "executed") == "executed"
+    assert storage.load_calls == 1
+
+
+def test_forged_or_malformed_policy_decisions_fall_back_to_live_resolution():
+    from deerflow.agents.middlewares import skill_tool_policy_middleware as policy_module
+
+    restricted = _skill("restricted", ["web_search"])
+    malformed_decisions = [
+        None,
+        [],
+        {"version": 999, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": True, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": 1, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": 1, "owner_token": "forged", "active_paths": "not-a-list", "allowed_names": ["task"]},
+    ]
+
+    for decision in malformed_decisions:
+        storage = StorageStub([restricted])
+        middleware = _middleware([])
+        middleware._storage = lambda storage=storage: storage
+        context = {policy_module._POLICY_DECISION_CONTEXT_KEY: decision}
+        request = ToolRequestStub(
+            "task",
+            state={"skill_context": [{"path": restricted.get_container_file_path()}]},
+            context=context,
+        )
+
+        result = middleware.wrap_tool_call(request, lambda _: "executed")
+
+        assert result.status == "error"
+        assert storage.load_calls == 1
+
+
+def test_policy_decision_path_mismatch_falls_back_to_live_resolution():
+    first = _skill("first", ["web_search"])
+    second = _skill("second", ["bash"])
+    storage = StorageStub([first, second])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    first_state = {"skill_context": [{"path": first.get_container_file_path()}]}
+    second_state = {"skill_context": [{"path": second.get_container_file_path()}]}
+
+    middleware.wrap_model_call(ModelRequestStub([NamedTool("web_search")], state=first_state, context=context), lambda request: request)
+    result = middleware.wrap_tool_call(ToolRequestStub("web_search", state=second_state, context=context), lambda _: "executed")
+
+    assert result.status == "error"
+    assert storage.load_calls == 2
+
+
+def test_active_paths_support_attribute_based_state():
+    restricted = _skill("restricted", ["web_search"])
+    middleware = _middleware([restricted])
+    state = SimpleNamespace(skill_context=[{"path": restricted.get_container_file_path()}])
+    request = ModelRequestStub([NamedTool("task"), NamedTool("web_search")], state=state)
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["web_search"]
+
+
+def test_active_paths_support_falsey_attribute_based_state():
+    class FalseyState:
+        skill_context = []
+
+        def __bool__(self):
+            return False
+
+    restricted = _skill("restricted", ["web_search"])
+    state = FalseyState()
+    state.skill_context = [{"path": restricted.get_container_file_path()}]
+    middleware = _middleware([restricted])
+    request = ModelRequestStub([NamedTool("task"), NamedTool("web_search")])
+    request.state = state
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["web_search"]
+
+
+def test_unknown_state_shape_is_logged_instead_of_silently_ignored(caplog):
+    middleware = _middleware([])
+    request = ModelRequestStub([NamedTool("task")], state=object())
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["task"]
+    assert "Unsupported agent state shape" in caplog.text
 
 
 def test_next_model_call_refreshes_the_policy_decision():

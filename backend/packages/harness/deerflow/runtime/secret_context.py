@@ -51,6 +51,27 @@ def read_active_secrets(context: Any) -> dict[str, str]:
     return _string_pairs(context.get(ACTIVE_SECRETS_CONTEXT_KEY))
 
 
+def write_slash_skill_source_path(context: Any, path: str) -> None:
+    """Persist the canonical slash-activated skill path in a run context.
+
+    The source contains only a path reference; consumers must resolve it
+    against the live skill registry before trusting any skill metadata.
+    """
+    if isinstance(context, dict) and isinstance(path, str) and path:
+        context[_SLASH_SECRET_SOURCE_KEY] = {"path": path}
+
+
+def read_slash_skill_source_path(context: Any) -> str | None:
+    """Return the canonical slash-activated skill path, if well formed."""
+    if not isinstance(context, dict):
+        return None
+    source = context.get(_SLASH_SECRET_SOURCE_KEY)
+    if not isinstance(source, dict):
+        return None
+    path = source.get("path")
+    return path if isinstance(path, str) and path else None
+
+
 # Private run-context keys the skill-activation middleware uses to carry secret
 # bindings across a run. Only ``secrets`` / ``__active_skill_secrets`` hold
 # values; the binding-source and audit keys hold names only. All are listed so

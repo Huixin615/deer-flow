@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import posixpath
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+import secrets
+from collections.abc import Awaitable, Callable, Mapping
 from typing import TYPE_CHECKING, override
 
 from langchain.agents import AgentState
@@ -16,7 +16,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from deerflow.runtime.secret_context import _SLASH_SECRET_SOURCE_KEY
+from deerflow.runtime.secret_context import read_slash_skill_source_path
 from deerflow.skills.storage import get_or_new_skill_storage, get_or_new_user_skill_storage
 from deerflow.skills.tool_policy import ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES, allowed_tool_names_for_skills
 from deerflow.skills.types import Skill
@@ -28,12 +28,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _POLICY_DECISION_CONTEXT_KEY = "__skill_tool_policy_decision"
-
-
-@dataclass(frozen=True, slots=True)
-class _PolicyDecision:
-    active_paths: tuple[str, ...]
-    allowed_names: frozenset[str] | None
+_POLICY_DECISION_VERSION = 1
+_MISSING_POLICY_DECISION = object()
 
 
 class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
@@ -55,6 +51,7 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
+        self._decision_owner_token = secrets.token_urlsafe(24)
 
     def _storage(self) -> SkillStorage:
         if self._user_id is not None:
@@ -67,15 +64,22 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
     def _active_paths(request: ModelRequest | ToolCallRequest) -> list[str]:
         paths: list[str] = []
         context = getattr(getattr(request, "runtime", None), "context", None)
-        if isinstance(context, dict):
-            slash_source = context.get(_SLASH_SECRET_SOURCE_KEY)
-            if isinstance(slash_source, dict) and isinstance(slash_source.get("path"), str):
-                paths.append(slash_source["path"])
+        slash_path = read_slash_skill_source_path(context)
+        if slash_path is not None:
+            paths.append(slash_path)
 
-        state = getattr(request, "state", None) or {}
-        try:
+        state = getattr(request, "state", None)
+        if state is None:
+            state = {}
+        if isinstance(state, Mapping):
             entries = state.get("skill_context") or []
-        except AttributeError:
+        elif hasattr(state, "skill_context"):
+            entries = getattr(state, "skill_context") or []
+        else:
+            logger.warning("Unsupported agent state shape for skill tool policy: %s", type(state).__name__)
+            entries = []
+        if not isinstance(entries, (list, tuple)):
+            logger.warning("Invalid skill_context shape for skill tool policy: %s", type(entries).__name__)
             entries = []
         for entry in entries:
             if isinstance(entry, dict) and isinstance(entry.get("path"), str):
@@ -129,17 +133,39 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
     def _store_policy_decision(self, request: ModelRequest, paths: tuple[str, ...], allowed: set[str] | None) -> None:
         context = self._runtime_context(request)
         if context is not None:
-            context[_POLICY_DECISION_CONTEXT_KEY] = _PolicyDecision(
-                active_paths=paths,
-                allowed_names=None if allowed is None else frozenset(allowed),
-            )
+            context[_POLICY_DECISION_CONTEXT_KEY] = {
+                "version": _POLICY_DECISION_VERSION,
+                "owner_token": self._decision_owner_token,
+                "active_paths": list(paths),
+                "allowed_names": None if allowed is None else sorted(allowed),
+            }
+
+    def _read_policy_decision(self, context: dict | None, paths: tuple[str, ...]) -> set[str] | None | object:
+        if context is None:
+            return _MISSING_POLICY_DECISION
+        decision = context.get(_POLICY_DECISION_CONTEXT_KEY)
+        if not isinstance(decision, dict):
+            return _MISSING_POLICY_DECISION
+        if type(decision.get("version")) is not int or decision["version"] != _POLICY_DECISION_VERSION:
+            return _MISSING_POLICY_DECISION
+        if not isinstance(decision.get("owner_token"), str) or decision["owner_token"] != self._decision_owner_token:
+            return _MISSING_POLICY_DECISION
+        stored_paths = decision.get("active_paths")
+        if not isinstance(stored_paths, list) or not all(isinstance(path, str) for path in stored_paths) or tuple(stored_paths) != paths:
+            return _MISSING_POLICY_DECISION
+        allowed = decision.get("allowed_names")
+        if allowed is None:
+            return None
+        if not isinstance(allowed, list) or not all(isinstance(name, str) for name in allowed):
+            return _MISSING_POLICY_DECISION
+        return set(allowed)
 
     def _allowed_names(self, request: ModelRequest | ToolCallRequest) -> set[str] | None:
         paths = tuple(self._active_paths(request))
         context = self._runtime_context(request)
-        decision = context.get(_POLICY_DECISION_CONTEXT_KEY) if context is not None else None
-        if isinstance(decision, _PolicyDecision) and decision.active_paths == paths:
-            return None if decision.allowed_names is None else set(decision.allowed_names)
+        decision = self._read_policy_decision(context, paths)
+        if decision is not _MISSING_POLICY_DECISION:
+            return decision
         return self._allowed_names_for_paths(paths)
 
     def _filter_model_request(
@@ -205,6 +231,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
+        if not self._active_paths(request):
+            return handler(request)
         blocked = self._blocked_tool_message(request)
         if blocked is not None:
             return blocked
