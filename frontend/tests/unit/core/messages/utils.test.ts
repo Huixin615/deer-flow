@@ -121,6 +121,14 @@ describe("branchable assistant groups", () => {
       "ai-history",
     ]);
   });
+
+  test("does not expose a completed turn that ends in processing", () => {
+    const groups = getMessageGroups(messages.slice(0, -1));
+
+    expect([...getBranchableAssistantGroupIds(groups, false)]).toEqual([
+      "ai-history",
+    ]);
+  });
 });
 
 test("reasoning + content (no tool calls) yields a single assistant bubble, not a duplicate processing group", () => {

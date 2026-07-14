@@ -157,10 +157,12 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
 export function getBranchableAssistantGroupIds(
   groups: MessageGroup[],
   isCurrentTurnLoading: boolean,
-) {
+): Set<string> {
   // Hidden messages were already removed by getMessageGroups, matching the
   // backend's branch checkpoint visibility rules. Within each visible human
-  // turn, only the final AI-bearing group can be a completed branch target.
+  // turn, branching is exposed only when the final AI-bearing group is a
+  // terminal assistant text group. Processing, present-files, and subagent
+  // groups do not render assistant actions.
   const branchableGroupIds = new Set<string>();
   let lastAIGroup: MessageGroup | null = null;
 
