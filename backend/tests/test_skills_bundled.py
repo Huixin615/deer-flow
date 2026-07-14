@@ -40,4 +40,4 @@ def test_runtime_registry_excludes_skill_reviewer_eval_fixtures() -> None:
     names = {skill.name for skill in skills}
 
     assert "skill-reviewer" in names
-    assert names.isdisjoint({"injection-example", "example-safe-skill", "partial-package-example", "vague-helper", "zh-output-example"})
+    assert all("evals/fixtures" not in skill.skill_file.as_posix() for skill in skills)

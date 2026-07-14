@@ -1065,9 +1065,19 @@ class TestLeakSurfaces:
         assert _SECRET not in str(config.get("configurable", {}))
 
     def test_redact_helper_strips_secret_keys(self):
-        from deerflow.runtime.secret_context import redact_secret_context_keys
+        from deerflow.runtime.secret_context import SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY, redact_secret_context_keys
 
-        ctx = {"thread_id": "t", "secrets": {"ERP_TOKEN": _SECRET}, "__active_skill_secrets": {"ERP_TOKEN": _SECRET}}
+        ctx = {
+            "thread_id": "t",
+            "secrets": {"ERP_TOKEN": _SECRET},
+            "__active_skill_secrets": {"ERP_TOKEN": _SECRET},
+            SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY: {
+                "version": 1,
+                "owner_token": "policy-owner-token",
+                "active_paths": ["/mnt/skills/public/reviewer/SKILL.md"],
+                "allowed_names": None,
+            },
+        }
         redacted = redact_secret_context_keys(ctx)
         assert redacted == {"thread_id": "t"}
         assert _SECRET not in str(redacted)
@@ -1076,14 +1086,28 @@ class TestLeakSurfaces:
         # The run-record persistence + run API echo the raw request config; the
         # stored/echoed copy must not carry secrets (verifier blocker), while the
         # live config used to drive the run keeps them.
-        from deerflow.runtime.secret_context import redact_config_secrets
+        from deerflow.runtime.secret_context import SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY, redact_config_secrets
 
-        config = {"context": {"secrets": {"ERP_TOKEN": _SECRET}, "thread_id": "t", "model_name": "m"}, "recursion_limit": 100}
+        config = {
+            "context": {
+                "secrets": {"ERP_TOKEN": _SECRET},
+                "thread_id": "t",
+                "model_name": "m",
+                SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY: {
+                    "version": 1,
+                    "owner_token": "forged-or-leaked-token",
+                    "active_paths": ["/mnt/skills/public/reviewer/SKILL.md"],
+                    "allowed_names": None,
+                },
+            },
+            "recursion_limit": 100,
+        }
         redacted = redact_config_secrets(config)
         assert _SECRET not in str(redacted)
         assert redacted["context"]["thread_id"] == "t"
         assert redacted["context"]["model_name"] == "m"
         assert "secrets" not in redacted["context"]
+        assert SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY not in redacted["context"]
         # Original is untouched (live config still has secrets).
         assert config["context"]["secrets"] == {"ERP_TOKEN": _SECRET}
 

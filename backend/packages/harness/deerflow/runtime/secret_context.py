@@ -25,6 +25,12 @@ SECRETS_CONTEXT_KEY = "secrets"
 # tool. Both reserved keys are stripped from trace payloads (see tracing redactor).
 ACTIVE_SECRETS_CONTEXT_KEY = "__active_skill_secrets"
 
+# Reserved sub-key holding the active skill tool-policy decision for one model
+# step. The decision includes a middleware-instance owner token that prevents a
+# caller from forging an allow-all decision in its mergeable run context, so the
+# entire value must be stripped from every observable serialization surface.
+SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY = "__skill_tool_policy_decision"
+
 
 def _string_pairs(raw: Any) -> dict[str, str]:
     if not isinstance(raw, dict):
@@ -99,6 +105,7 @@ REDACTED_CONTEXT_KEYS = frozenset(
         _SLASH_SECRET_SOURCE_KEY,
         _SECRETS_BINDING_AUDIT_KEY,
         _SLASH_SKILL_ACTIVATION_RUN_KEY,
+        SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY,
     }
 )
 

@@ -16,7 +16,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from deerflow.runtime.secret_context import read_slash_skill_source_path
+from deerflow.runtime.secret_context import SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY, read_slash_skill_source_path
 from deerflow.skills.storage import get_or_new_skill_storage, get_or_new_user_skill_storage
 from deerflow.skills.tool_policy import ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES, allowed_tool_names_for_skills
 from deerflow.skills.types import Skill
@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_POLICY_DECISION_CONTEXT_KEY = "__skill_tool_policy_decision"
 _POLICY_DECISION_VERSION = 1
 _MISSING_POLICY_DECISION = object()
 
@@ -133,7 +132,7 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
     def _store_policy_decision(self, request: ModelRequest, paths: tuple[str, ...], allowed: set[str] | None) -> None:
         context = self._runtime_context(request)
         if context is not None:
-            context[_POLICY_DECISION_CONTEXT_KEY] = {
+            context[SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY] = {
                 "version": _POLICY_DECISION_VERSION,
                 "owner_token": self._decision_owner_token,
                 "active_paths": list(paths),
@@ -143,7 +142,7 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
     def _read_policy_decision(self, context: dict | None, paths: tuple[str, ...]) -> set[str] | None | object:
         if context is None:
             return _MISSING_POLICY_DECISION
-        decision = context.get(_POLICY_DECISION_CONTEXT_KEY)
+        decision = context.get(SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY)
         if not isinstance(decision, dict):
             return _MISSING_POLICY_DECISION
         if type(decision.get("version")) is not int or decision["version"] != _POLICY_DECISION_VERSION:

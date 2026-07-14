@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 
-from deerflow.runtime.secret_context import write_slash_skill_source_path
+from deerflow.runtime.secret_context import SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY, write_slash_skill_source_path
 from deerflow.skills.types import Skill, SkillCategory
 
 
@@ -419,8 +419,6 @@ def test_policy_decision_is_json_safe_and_survives_round_trip():
 
 
 def test_forged_or_malformed_policy_decisions_fall_back_to_live_resolution():
-    from deerflow.agents.middlewares import skill_tool_policy_middleware as policy_module
-
     restricted = _skill("restricted", ["web_search"])
     malformed_decisions = [
         None,
@@ -435,7 +433,7 @@ def test_forged_or_malformed_policy_decisions_fall_back_to_live_resolution():
         storage = StorageStub([restricted])
         middleware = _middleware([])
         middleware._storage = lambda storage=storage: storage
-        context = {policy_module._POLICY_DECISION_CONTEXT_KEY: decision}
+        context = {SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY: decision}
         request = ToolRequestStub(
             "task",
             state={"skill_context": [{"path": restricted.get_container_file_path()}]},
