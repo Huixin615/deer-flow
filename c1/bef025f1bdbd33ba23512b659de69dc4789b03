@@ -1,0 +1,23 @@
+frontend/src/core/messages/utils.ts
+  s_2d417bee1ddc50::t_c57dda488e76f5 160,163-165
+frontend/tests/unit/core/messages/utils.test.ts
+  s_2d417bee1ddc50::t_38b091c3ead843 124-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "c1bef025f1bdbd33ba23512b659de69dc4789b03",
+  "prompts": {},
+  "sessions": {
+    "s_2d417bee1ddc50": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5bd6-cb97-73d3-8032-15005d0d75d5",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
