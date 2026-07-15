@@ -51,6 +51,17 @@ def _has_invalid_tool_name(name: object) -> bool:
     return not _valid_tool_name(name)
 
 
+def _parse_json_object(value: object) -> dict | None:
+    """Parse a JSON-object string, returning None for other inputs."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _normalize_tool_arguments(arguments: object) -> str:
     """Return a JSON-object string safe for OpenAI-compatible replay."""
     if isinstance(arguments, dict):
@@ -58,13 +69,7 @@ def _normalize_tool_arguments(arguments: object) -> str:
             return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
         except (TypeError, ValueError):
             return "{}"
-    if not isinstance(arguments, str):
-        return "{}"
-    try:
-        parsed = json.loads(arguments)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return "{}"
-    return arguments if isinstance(parsed, dict) else "{}"
+    return arguments if _parse_json_object(arguments) is not None else "{}"
 
 
 class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
@@ -116,13 +121,8 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
                 args = raw_tc.get("args", {})
                 if not args and isinstance(function, dict):
-                    raw_args = function.get("arguments")
-                    if isinstance(raw_args, str):
-                        try:
-                            parsed_args = json.loads(raw_args)
-                        except (TypeError, ValueError, json.JSONDecodeError):
-                            parsed_args = {}
-                        args = parsed_args if isinstance(parsed_args, dict) else {}
+                    parsed_args = _parse_json_object(function.get("arguments"))
+                    args = parsed_args if parsed_args is not None else {}
 
                 normalized_call = {
                     "id": raw_tc.get("id"),
