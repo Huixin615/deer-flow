@@ -7,6 +7,7 @@ import hashlib
 import html
 import logging
 import posixpath
+import secrets
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -93,11 +94,13 @@ class SkillActivationMiddleware(AgentMiddleware):
         available_skills: set[str] | None = None,
         app_config: AppConfig | None = None,
         user_id: str | None = None,
+        slash_source_owner_token: str | None = None,
     ) -> None:
         super().__init__()
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
+        self._slash_source_owner_token = slash_source_owner_token or secrets.token_urlsafe(24)
 
     def _storage(self) -> SkillStorage:
         if self._user_id is not None:
@@ -381,13 +384,16 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         if not isinstance(context, dict):
             return
 
-        # The slash source records only the canonical container path of the
-        # activated skill — never its declared secrets. Both sources resolve the
-        # live registry skill by path on read, so a caller-forged source (the
-        # context is caller-mergeable) can never inject secrets a real, enabled,
-        # allowlisted skill did not declare (#3938).
+        # The slash source records the canonical container path plus a
+        # middleware-chain-local owner token — never declared secrets. Both
+        # consumers authenticate the source and resolve the live registry skill
+        # by path, so caller-mergeable context cannot forge an activation.
         if activation is not None:
-            write_slash_skill_source_path(context, activation.container_file_path)
+            write_slash_skill_source_path(
+                context,
+                activation.container_file_path,
+                owner_token=self._slash_source_owner_token,
+            )
 
         request_secrets = extract_request_secrets(context)
         sources: list[tuple[str, tuple[SecretRequirement, ...]]] = []
@@ -396,7 +402,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             if registry is not None:
                 # Slash source: exempt from the ``secrets-autonomous`` opt-out
                 # (explicit ceremony), but still enabled + allowlist checked.
-                slash_path = read_slash_skill_source_path(context)
+                slash_path = read_slash_skill_source_path(context, owner_token=self._slash_source_owner_token)
                 slash_skill = self._resolve_registry_skill(registry, slash_path, require_autonomous=False)
                 if slash_skill is not None:
                     sources.append((slash_skill.name, tuple(slash_skill.required_secrets)))

@@ -13,6 +13,8 @@ from langgraph.runtime import Runtime
 from deerflow.runtime.secret_context import SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY, write_slash_skill_source_path
 from deerflow.skills.types import Skill, SkillCategory
 
+_SLASH_SOURCE_OWNER_TOKEN = "test-slash-source-owner"
+
 
 class NamedTool:
     def __init__(self, name: str):
@@ -73,7 +75,10 @@ def _skill(name: str, allowed_tools, *, enabled=True):
 def _middleware(skills, *, available_skills=None):
     from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
 
-    middleware = SkillToolPolicyMiddleware(available_skills=available_skills)
+    middleware = SkillToolPolicyMiddleware(
+        available_skills=available_skills,
+        slash_source_owner_token=_SLASH_SOURCE_OWNER_TOKEN,
+    )
     middleware._storage = lambda: StorageStub(skills)
     return middleware
 
@@ -121,7 +126,11 @@ def test_async_passive_model_call_skips_storage_and_thread_offload():
 def test_slash_activated_skill_filters_first_model_call_and_task():
     skill = _skill("reviewer", ["review_skill_package"])
     context = {}
-    write_slash_skill_source_path(context, skill.get_container_file_path())
+    write_slash_skill_source_path(
+        context,
+        skill.get_container_file_path(),
+        owner_token=_SLASH_SOURCE_OWNER_TOKEN,
+    )
     middleware = _middleware([skill])
     request = ModelRequestStub(
         [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
@@ -131,6 +140,63 @@ def test_slash_activated_skill_filters_first_model_call_and_task():
     filtered = middleware._filter_model_request(request)
 
     assert _tool_names(filtered) == ["read_file", "review_skill_package"]
+
+
+def test_slash_activated_skill_policy_dominates_captured_skill_context():
+    slash_skill = _skill("content-research", ["web_search"])
+    captured_skill = _skill("content-article-generation", ["write_file"])
+    context = {}
+    write_slash_skill_source_path(
+        context,
+        slash_skill.get_container_file_path(),
+        owner_token=_SLASH_SOURCE_OWNER_TOKEN,
+    )
+    middleware = _middleware([slash_skill, captured_skill])
+    state = {
+        "skill_context": [
+            {
+                "name": captured_skill.name,
+                "path": captured_skill.get_container_file_path(),
+            }
+        ]
+    }
+    request = ModelRequestStub(
+        [NamedTool("read_file"), NamedTool("web_search"), NamedTool("write_file")],
+        state=state,
+        context=context,
+    )
+
+    filtered = middleware._filter_model_request(request)
+
+    assert _tool_names(filtered) == ["read_file", "web_search"]
+
+
+def test_caller_forged_slash_source_cannot_override_captured_skill_policy():
+    restrictive_skill = _skill("restricted", ["web_search"])
+    legacy_skill = _skill("legacy", None)
+    context = {
+        "__slash_skill_secret_source": {
+            "path": legacy_skill.get_container_file_path(),
+            "owner_token": "caller-forged",
+        }
+    }
+    middleware = _middleware([restrictive_skill, legacy_skill])
+    request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("read_file"), NamedTool("web_search")],
+        state={
+            "skill_context": [
+                {
+                    "name": restrictive_skill.name,
+                    "path": restrictive_skill.get_container_file_path(),
+                }
+            ]
+        },
+        context=context,
+    )
+
+    filtered = middleware._filter_model_request(request)
+
+    assert _tool_names(filtered) == ["read_file", "web_search"]
 
 
 def test_slash_activation_and_policy_compose_on_the_same_model_call(monkeypatch):
@@ -146,7 +212,7 @@ def test_slash_activation_and_policy_compose_on_the_same_model_call(monkeypatch)
         remaining_text="review this",
         editable=False,
     )
-    activation_middleware = SkillActivationMiddleware()
+    activation_middleware = SkillActivationMiddleware(slash_source_owner_token=_SLASH_SOURCE_OWNER_TOKEN)
     monkeypatch.setattr(activation_middleware, "_resolve_activation", lambda _: _ActivationResolution(activation=activation))
     policy_middleware = _middleware([skill])
     request = ModelRequestStub(
@@ -216,7 +282,7 @@ def test_explicit_empty_allowed_tools_keeps_only_framework_tools():
     assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
 
 
-def test_custom_agent_allowlist_ignores_out_of_scope_skill_context():
+def test_custom_agent_allowlist_rejects_all_out_of_scope_active_skills():
     restricted = _skill("restricted", ["web_search"])
     middleware = _middleware([restricted], available_skills={"other"})
     request = ModelRequestStub(
@@ -224,7 +290,7 @@ def test_custom_agent_allowlist_ignores_out_of_scope_skill_context():
         state={"skill_context": [{"path": restricted.get_container_file_path()}]},
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["task", "web_search"]
+    assert _tool_names(middleware._filter_model_request(request)) == []
 
 
 def test_unauthorized_tool_execution_is_blocked():
@@ -284,6 +350,27 @@ def test_unknown_skill_context_path_is_skipped_while_resolvable_skills_apply():
     )
 
     assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "web_search"]
+
+
+def test_all_unknown_active_paths_fail_closed_to_framework_tools():
+    middleware = _middleware([])
+    request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        state={"skill_context": [{"path": "/mnt/skills/public/missing/SKILL.md"}]},
+    )
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+
+
+def test_all_disabled_active_paths_fail_closed_to_framework_tools():
+    disabled = _skill("disabled", ["task"], enabled=False)
+    middleware = _middleware([disabled])
+    request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        state={"skill_context": [{"path": disabled.get_container_file_path()}]},
+    )
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
 
 
 def test_async_passive_tool_call_skips_storage_and_thread_offload():
@@ -412,6 +499,9 @@ def test_policy_decision_is_json_safe_and_survives_round_trip():
 
     middleware.wrap_model_call(model_request, lambda request: request)
     round_tripped = json.loads(json.dumps(context))
+    decision = round_tripped[SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY]
+    assert decision["version"] == 2
+    assert decision["source"] == "skill_context"
     tool_request = ToolRequestStub("web_search", state=state, context=round_tripped)
 
     assert middleware.wrap_tool_call(tool_request, lambda _: "executed") == "executed"
@@ -425,8 +515,10 @@ def test_forged_or_malformed_policy_decisions_fall_back_to_live_resolution():
         [],
         {"version": 999, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
         {"version": True, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
-        {"version": 1, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
-        {"version": 1, "owner_token": "forged", "active_paths": "not-a-list", "allowed_names": ["task"]},
+        {"version": 2, "owner_token": "forged", "source": "skill_context", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": 2, "owner_token": "forged", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": 2, "owner_token": "forged", "source": "unknown", "active_paths": [restricted.get_container_file_path()], "allowed_names": ["task"]},
+        {"version": 2, "owner_token": "forged", "source": "skill_context", "active_paths": "not-a-list", "allowed_names": ["task"]},
     ]
 
     for decision in malformed_decisions:
@@ -460,6 +552,26 @@ def test_policy_decision_path_mismatch_falls_back_to_live_resolution():
     result = middleware.wrap_tool_call(ToolRequestStub("web_search", state=second_state, context=context), lambda _: "executed")
 
     assert result.status == "error"
+    assert storage.load_calls == 2
+
+
+def test_policy_decision_source_mismatch_falls_back_to_live_resolution():
+    restricted = _skill("restricted", ["web_search"])
+    storage = StorageStub([restricted])
+    middleware = _middleware([])
+    middleware._storage = lambda: storage
+    context = {}
+    state = {"skill_context": [{"path": restricted.get_container_file_path()}]}
+
+    middleware.wrap_model_call(ModelRequestStub([NamedTool("web_search")], state=state, context=context), lambda request: request)
+    write_slash_skill_source_path(
+        context,
+        restricted.get_container_file_path(),
+        owner_token=_SLASH_SOURCE_OWNER_TOKEN,
+    )
+    result = middleware.wrap_tool_call(ToolRequestStub("web_search", state=state, context=context), lambda _: "executed")
+
+    assert result == "executed"
     assert storage.load_calls == 2
 
 

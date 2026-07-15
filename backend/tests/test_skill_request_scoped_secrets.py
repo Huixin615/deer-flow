@@ -389,18 +389,38 @@ class TestSecretCarrier:
         from deerflow.runtime.secret_context import read_slash_skill_source_path, write_slash_skill_source_path
 
         context = {}
-        write_slash_skill_source_path(context, "/mnt/skills/public/reviewer/SKILL.md")
+        write_slash_skill_source_path(
+            context,
+            "/mnt/skills/public/reviewer/SKILL.md",
+            owner_token="middleware-owner",
+        )
 
-        assert read_slash_skill_source_path(context) == "/mnt/skills/public/reviewer/SKILL.md"
+        assert read_slash_skill_source_path(context, owner_token="middleware-owner") == "/mnt/skills/public/reviewer/SKILL.md"
+        assert read_slash_skill_source_path(context, owner_token="caller-forged") is None
 
     def test_slash_skill_source_path_rejects_malformed_shapes(self):
         from deerflow.runtime.secret_context import read_slash_skill_source_path
 
-        malformed = [None, "path", [], {"path": None}, {"path": ""}, {"path": 7}]
+        malformed = [
+            None,
+            "path",
+            [],
+            {"path": None, "owner_token": "middleware-owner"},
+            {"path": "", "owner_token": "middleware-owner"},
+            {"path": 7, "owner_token": "middleware-owner"},
+            {"path": "/mnt/skills/public/reviewer/SKILL.md"},
+            {"path": "/mnt/skills/public/reviewer/SKILL.md", "owner_token": ""},
+        ]
         for value in malformed:
-            assert read_slash_skill_source_path({"__slash_skill_secret_source": value}) is None
-        assert read_slash_skill_source_path({}) is None
-        assert read_slash_skill_source_path(None) is None
+            assert (
+                read_slash_skill_source_path(
+                    {"__slash_skill_secret_source": value},
+                    owner_token="middleware-owner",
+                )
+                is None
+            )
+        assert read_slash_skill_source_path({}, owner_token="middleware-owner") is None
+        assert read_slash_skill_source_path(None, owner_token="middleware-owner") is None
 
 
 def _make_secret_skill(tmp_path: Path, name: str, required_secrets, *, enabled: bool = True, secrets_autonomous: bool = True):

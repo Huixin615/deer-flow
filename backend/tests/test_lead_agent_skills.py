@@ -300,7 +300,7 @@ def test_make_lead_agent_empty_skills_passed_correctly(monkeypatch):
     assert captured_skills[-1] == {"skill1"}
 
 
-def test_make_lead_agent_filters_tools_from_available_skills(monkeypatch):
+def test_make_lead_agent_custom_skill_allowlist_does_not_activate_tool_policy(monkeypatch):
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -323,7 +323,8 @@ def test_make_lead_agent_filters_tools_from_available_skills(monkeypatch):
 
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
 
-    # With skills.deferred_discovery=True, describe_skill is added to tools
+    # The custom-agent skill list controls discovery/activation, not baseline
+    # tools. With deferred discovery, describe_skill is added as well.
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert "task" in tool_names
     assert "read_file" in tool_names
@@ -361,7 +362,7 @@ def test_make_lead_agent_all_legacy_skills_preserve_all_tools(monkeypatch):
 
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
 
-    # describe_skill is appended after skill-allowed-tools filtering (it bypasses policy).
+    # No skill is active yet, so the configured lead tools remain available.
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert tool_names == ["bash", "read_file", "update_agent", "describe_skill"]
 

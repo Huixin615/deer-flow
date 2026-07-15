@@ -27,8 +27,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_POLICY_DECISION_VERSION = 1
+_POLICY_DECISION_VERSION = 2
+_POLICY_SOURCE_PASSIVE = "passive"
+_POLICY_SOURCE_SLASH = "slash"
+_POLICY_SOURCE_SKILL_CONTEXT = "skill_context"
+_POLICY_SOURCES = frozenset({_POLICY_SOURCE_PASSIVE, _POLICY_SOURCE_SLASH, _POLICY_SOURCE_SKILL_CONTEXT})
 _MISSING_POLICY_DECISION = object()
+
+type _PolicySignature = tuple[str, tuple[str, ...]]
 
 
 class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
@@ -36,7 +42,9 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
 
     Merely enabling a skill makes it discoverable; it does not activate its
     authority policy. A skill becomes policy-active when the user slash-activates
-    it for the run or after the model loads it into ``skill_context``.
+    it for the run or after the model loads it into ``skill_context``. Explicit
+    slash activation dominates for the rest of that run: passively reading a
+    second skill cannot widen the slash skill's authority.
     """
 
     def __init__(
@@ -45,11 +53,13 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         available_skills: set[str] | None = None,
         app_config: AppConfig | None = None,
         user_id: str | None = None,
+        slash_source_owner_token: str | None = None,
     ) -> None:
         super().__init__()
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
+        self._slash_source_owner_token = slash_source_owner_token or secrets.token_urlsafe(24)
         self._decision_owner_token = secrets.token_urlsafe(24)
 
     def _storage(self) -> SkillStorage:
@@ -59,14 +69,13 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             return get_or_new_skill_storage(app_config=self._app_config)
         return get_or_new_skill_storage()
 
-    @staticmethod
-    def _active_paths(request: ModelRequest | ToolCallRequest) -> list[str]:
-        paths: list[str] = []
+    def _active_policy(self, request: ModelRequest | ToolCallRequest) -> _PolicySignature:
         context = getattr(getattr(request, "runtime", None), "context", None)
-        slash_path = read_slash_skill_source_path(context)
+        slash_path = read_slash_skill_source_path(context, owner_token=self._slash_source_owner_token)
         if slash_path is not None:
-            paths.append(slash_path)
+            return _POLICY_SOURCE_SLASH, (slash_path,)
 
+        paths: list[str] = []
         state = getattr(request, "state", None)
         if state is None:
             state = {}
@@ -83,7 +92,9 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         for entry in entries:
             if isinstance(entry, dict) and isinstance(entry.get("path"), str):
                 paths.append(entry["path"])
-        return paths
+        if paths:
+            return _POLICY_SOURCE_SKILL_CONTEXT, tuple(paths)
+        return _POLICY_SOURCE_PASSIVE, ()
 
     def _active_skills_for_paths(self, paths: tuple[str, ...]) -> tuple[list[Skill], bool]:
         if not paths:
@@ -107,12 +118,19 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             if skill is None:
                 logger.warning("Active skill path could not be resolved for allowed-tools policy: %s", path)
                 continue
-            if not skill.enabled or (self._available_skills is not None and skill.name not in self._available_skills):
+            if not skill.enabled:
+                logger.warning("Active skill is disabled for allowed-tools policy: %s", path)
+                continue
+            if self._available_skills is not None and skill.name not in self._available_skills:
+                logger.warning("Active skill is outside the agent allowlist for allowed-tools policy: %s", path)
                 continue
             if skill.name in seen:
                 continue
             seen.add(skill.name)
             active.append(skill)
+        if not active:
+            logger.warning("No active skill references could be authorized for allowed-tools policy; failing closed")
+            return [], True
         return active, False
 
     def _allowed_names_for_paths(self, paths: tuple[str, ...]) -> set[str] | None:
@@ -129,17 +147,19 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         context = getattr(getattr(request, "runtime", None), "context", None)
         return context if isinstance(context, dict) else None
 
-    def _store_policy_decision(self, request: ModelRequest, paths: tuple[str, ...], allowed: set[str] | None) -> None:
+    def _store_policy_decision(self, request: ModelRequest, policy: _PolicySignature, allowed: set[str] | None) -> None:
         context = self._runtime_context(request)
         if context is not None:
+            source, paths = policy
             context[SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY] = {
                 "version": _POLICY_DECISION_VERSION,
                 "owner_token": self._decision_owner_token,
+                "source": source,
                 "active_paths": list(paths),
                 "allowed_names": None if allowed is None else sorted(allowed),
             }
 
-    def _read_policy_decision(self, context: dict | None, paths: tuple[str, ...]) -> set[str] | None | object:
+    def _read_policy_decision(self, context: dict | None, policy: _PolicySignature) -> set[str] | None | object:
         if context is None:
             return _MISSING_POLICY_DECISION
         decision = context.get(SKILL_TOOL_POLICY_DECISION_CONTEXT_KEY)
@@ -148,6 +168,10 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         if type(decision.get("version")) is not int or decision["version"] != _POLICY_DECISION_VERSION:
             return _MISSING_POLICY_DECISION
         if not isinstance(decision.get("owner_token"), str) or decision["owner_token"] != self._decision_owner_token:
+            return _MISSING_POLICY_DECISION
+        source, paths = policy
+        stored_source = decision.get("source")
+        if not isinstance(stored_source, str) or stored_source not in _POLICY_SOURCES or stored_source != source:
             return _MISSING_POLICY_DECISION
         stored_paths = decision.get("active_paths")
         if not isinstance(stored_paths, list) or not all(isinstance(path, str) for path in stored_paths) or tuple(stored_paths) != paths:
@@ -159,10 +183,16 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             return _MISSING_POLICY_DECISION
         return set(allowed)
 
-    def _allowed_names(self, request: ModelRequest | ToolCallRequest) -> set[str] | None:
-        paths = tuple(self._active_paths(request))
+    def _allowed_names(
+        self,
+        request: ModelRequest | ToolCallRequest,
+        *,
+        policy: _PolicySignature | None = None,
+    ) -> set[str] | None:
+        resolved_policy = self._active_policy(request) if policy is None else policy
+        _, paths = resolved_policy
         context = self._runtime_context(request)
-        decision = self._read_policy_decision(context, paths)
+        decision = self._read_policy_decision(context, resolved_policy)
         if decision is not _MISSING_POLICY_DECISION:
             return decision
         return self._allowed_names_for_paths(paths)
@@ -171,13 +201,14 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         self,
         request: ModelRequest,
         *,
-        paths: tuple[str, ...] | None = None,
+        policy: _PolicySignature | None = None,
         refresh_decision: bool = False,
     ) -> ModelRequest:
-        resolved_paths = tuple(self._active_paths(request)) if paths is None else paths
-        allowed = self._allowed_names_for_paths(resolved_paths) if refresh_decision else self._allowed_names(request)
+        resolved_policy = self._active_policy(request) if policy is None else policy
+        _, paths = resolved_policy
+        allowed = self._allowed_names_for_paths(paths) if refresh_decision else self._allowed_names(request, policy=resolved_policy)
         if refresh_decision:
-            self._store_policy_decision(request, resolved_paths, allowed)
+            self._store_policy_decision(request, resolved_policy, allowed)
         if allowed is None:
             return request
         tools = [tool for tool in request.tools if getattr(tool, "name", None) in allowed]
@@ -185,8 +216,13 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             logger.debug("Skill policy filtered %d lead tool schema(s)", len(request.tools) - len(tools))
         return request.override(tools=tools)
 
-    def _blocked_tool_message(self, request: ToolCallRequest) -> ToolMessage | None:
-        allowed = self._allowed_names(request)
+    def _blocked_tool_message(
+        self,
+        request: ToolCallRequest,
+        *,
+        policy: _PolicySignature | None = None,
+    ) -> ToolMessage | None:
+        allowed = self._allowed_names(request, policy=policy)
         name = str(request.tool_call.get("name") or "")
         if allowed is None or not name or name in allowed:
             return None
@@ -203,8 +239,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        paths = tuple(self._active_paths(request))
-        return handler(self._filter_model_request(request, paths=paths, refresh_decision=True))
+        policy = self._active_policy(request)
+        return handler(self._filter_model_request(request, policy=policy, refresh_decision=True))
 
     @override
     async def awrap_model_call(
@@ -212,14 +248,15 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        paths = tuple(self._active_paths(request))
+        policy = self._active_policy(request)
+        _, paths = policy
         if not paths:
-            self._store_policy_decision(request, paths, None)
+            self._store_policy_decision(request, policy, None)
             return await handler(request)
         filtered = await asyncio.to_thread(
             self._filter_model_request,
             request,
-            paths=paths,
+            policy=policy,
             refresh_decision=True,
         )
         return await handler(filtered)
@@ -230,9 +267,10 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        if not self._active_paths(request):
+        policy = self._active_policy(request)
+        if not policy[1]:
             return handler(request)
-        blocked = self._blocked_tool_message(request)
+        blocked = self._blocked_tool_message(request, policy=policy)
         if blocked is not None:
             return blocked
         return handler(request)
@@ -243,9 +281,10 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        if not self._active_paths(request):
+        policy = self._active_policy(request)
+        if not policy[1]:
             return await handler(request)
-        blocked = await asyncio.to_thread(self._blocked_tool_message, request)
+        blocked = await asyncio.to_thread(self._blocked_tool_message, request, policy=policy)
         if blocked is not None:
             return blocked
         return await handler(request)

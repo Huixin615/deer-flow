@@ -73,6 +73,11 @@ def test_load_skills_stops_at_skill_package_boundary(tmp_path: Path):
         "injection-example",
         "Calibration fixture",
     )
+    _write_skill(
+        skills_root / "public" / "reviewer" / "examples" / "helper",
+        "nested-example",
+        "Nested package example",
+    )
 
     skills = get_or_new_skill_storage(skills_path=skills_root).load_skills(enabled_only=False)
 

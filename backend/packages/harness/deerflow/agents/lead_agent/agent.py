@@ -21,6 +21,7 @@ middleware, and the async path inside ``TitleMiddleware``. Any new in-graph
 from __future__ import annotations
 
 import logging
+import secrets
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
@@ -283,13 +284,28 @@ def build_middlewares(
     # explicit user activation priority over model-side relevance guessing.
     from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
 
-    middlewares.append(SkillActivationMiddleware(available_skills=available_skills, app_config=resolved_app_config, user_id=user_id))
+    slash_source_owner_token = secrets.token_urlsafe(24)
+    middlewares.append(
+        SkillActivationMiddleware(
+            available_skills=available_skills,
+            app_config=resolved_app_config,
+            user_id=user_id,
+            slash_source_owner_token=slash_source_owner_token,
+        )
+    )
 
     # Enabled skills are only discoverable metadata. Apply allowed-tools at
     # runtime after explicit slash activation or an actual skill-file load.
     from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
 
-    middlewares.append(SkillToolPolicyMiddleware(available_skills=available_skills, app_config=resolved_app_config, user_id=user_id))
+    middlewares.append(
+        SkillToolPolicyMiddleware(
+            available_skills=available_skills,
+            app_config=resolved_app_config,
+            user_id=user_id,
+            slash_source_owner_token=slash_source_owner_token,
+        )
+    )
 
     # Capture completed task delegations and loaded skill files before
     # summarization can compact them, then inject durable context channels
@@ -536,10 +552,10 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
             container_base_path=container_base_path,
         )
         raw_tools = get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled, app_config=resolved_app_config) + [setup_agent]
-        filtered = raw_tools
+        configured_tools = raw_tools
         if non_interactive:
-            filtered = [tool for tool in filtered if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
-        final_tools, setup = assemble_deferred_tools(filtered, enabled=resolved_app_config.tool_search.enabled)
+            configured_tools = [tool for tool in configured_tools if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
+        final_tools, setup = assemble_deferred_tools(configured_tools, enabled=resolved_app_config.tool_search.enabled)
         mcp_routing_middleware = build_mcp_routing_middleware(
             final_tools,
             setup,
@@ -576,8 +592,9 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
 
     # Custom agents can update their own SOUL.md / config via update_agent.
     # The default agent (no agent_name) does not see this tool.
-    # Build skill search setup from policy-filtered skills (same list used for
-    # tool-policy filtering), so describe_skill only exposes allowed skills.
+    # Build skill search setup from the agent-available skills. The same
+    # allowlist is enforced by the runtime policy resolver, so describe_skill
+    # cannot expose a skill this custom agent is not allowed to activate.
     skill_setup = build_skill_search_setup(
         enabled_skills,
         enabled=skill_search_enabled,
@@ -601,16 +618,16 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     extra_tools = [update_agent] if agent_name and not is_webhook_channel else []
     # Default lead agent (unchanged behavior)
     raw_tools = get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
-    filtered = raw_tools + extra_tools
+    configured_tools = raw_tools + extra_tools
     if non_interactive:
-        filtered = [tool for tool in filtered if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
-    final_tools, setup = assemble_deferred_tools(filtered, enabled=resolved_app_config.tool_search.enabled)
+        configured_tools = [tool for tool in configured_tools if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
+    final_tools, setup = assemble_deferred_tools(configured_tools, enabled=resolved_app_config.tool_search.enabled)
     mcp_routing_middleware = build_mcp_routing_middleware(
         final_tools,
         setup,
         top_k=resolved_app_config.tool_search.auto_promote_top_k,
     )
-    mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(filtered, deferred_names=setup.deferred_names)
+    mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(configured_tools, deferred_names=setup.deferred_names)
     if skill_setup.describe_skill_tool:
         final_tools.append(skill_setup.describe_skill_tool)
     if should_use_memory_tools(resolved_app_config.memory):
