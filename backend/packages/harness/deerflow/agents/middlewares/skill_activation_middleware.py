@@ -7,7 +7,6 @@ import hashlib
 import html
 import logging
 import posixpath
-import secrets
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -94,13 +93,15 @@ class SkillActivationMiddleware(AgentMiddleware):
         available_skills: set[str] | None = None,
         app_config: AppConfig | None = None,
         user_id: str | None = None,
-        slash_source_owner_token: str | None = None,
+        slash_source_owner_token: str,
     ) -> None:
         super().__init__()
+        if not isinstance(slash_source_owner_token, str) or not slash_source_owner_token:
+            raise ValueError("slash_source_owner_token must be a non-empty string")
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
-        self._slash_source_owner_token = slash_source_owner_token or secrets.token_urlsafe(24)
+        self._slash_source_owner_token = slash_source_owner_token
 
     def _storage(self) -> SkillStorage:
         if self._user_id is not None:

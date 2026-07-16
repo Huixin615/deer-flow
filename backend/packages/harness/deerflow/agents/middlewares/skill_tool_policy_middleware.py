@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import posixpath
 import secrets
@@ -33,6 +34,7 @@ _POLICY_SOURCE_SLASH = "slash"
 _POLICY_SOURCE_SKILL_CONTEXT = "skill_context"
 _POLICY_SOURCES = frozenset({_POLICY_SOURCE_PASSIVE, _POLICY_SOURCE_SLASH, _POLICY_SOURCE_SKILL_CONTEXT})
 _MISSING_POLICY_DECISION = object()
+_TOOL_SEARCH_NAME = "tool_search"
 
 type _PolicySignature = tuple[str, tuple[str, ...]]
 
@@ -53,13 +55,15 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         available_skills: set[str] | None = None,
         app_config: AppConfig | None = None,
         user_id: str | None = None,
-        slash_source_owner_token: str | None = None,
+        slash_source_owner_token: str,
     ) -> None:
         super().__init__()
+        if not isinstance(slash_source_owner_token, str) or not slash_source_owner_token:
+            raise ValueError("slash_source_owner_token must be a non-empty string")
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
-        self._slash_source_owner_token = slash_source_owner_token or secrets.token_urlsafe(24)
+        self._slash_source_owner_token = slash_source_owner_token
         self._decision_owner_token = secrets.token_urlsafe(24)
 
     def _storage(self) -> SkillStorage:
@@ -220,9 +224,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         self,
         request: ToolCallRequest,
         *,
-        policy: _PolicySignature | None = None,
+        allowed: set[str] | None,
     ) -> ToolMessage | None:
-        allowed = self._allowed_names(request, policy=policy)
         name = str(request.tool_call.get("name") or "")
         if allowed is None or not name or name in allowed:
             return None
@@ -231,6 +234,75 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
             tool_call_id=str(request.tool_call.get("id") or "missing_tool_call_id"),
             name=name,
             status="error",
+        )
+
+    @staticmethod
+    def _tool_search_policy_error(request: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content="Error: tool_search returned a result that could not be validated against the active skill policy.",
+            tool_call_id=str(request.tool_call.get("id") or "missing_tool_call_id"),
+            name=_TOOL_SEARCH_NAME,
+            status="error",
+        )
+
+    def _filter_tool_search_result(
+        self,
+        request: ToolCallRequest,
+        result: ToolMessage | Command,
+        *,
+        allowed: set[str] | None,
+    ) -> ToolMessage | Command:
+        """Remove denied schemas and promotions from tool_search output.
+
+        Keeping tool_search available is safe only if it cannot return a full
+        schema for a tool removed by the active policy. Deferred filtering still
+        controls when an allowed schema becomes model-visible; this method keeps
+        the discovery result itself within the same authorization boundary.
+        """
+        name = str(request.tool_call.get("name") or "")
+        if name != _TOOL_SEARCH_NAME or allowed is None:
+            return result
+        if not isinstance(result, Command) or not isinstance(result.update, dict):
+            logger.warning("Active-policy tool_search returned an unsupported result shape")
+            return self._tool_search_policy_error(request)
+
+        promoted = result.update.get("promoted")
+        messages = result.update.get("messages")
+        if not isinstance(promoted, dict) or not isinstance(messages, list) or len(messages) != 1:
+            logger.warning("Active-policy tool_search command omitted promoted/messages updates")
+            return self._tool_search_policy_error(request)
+        raw_names = promoted.get("names")
+        if not isinstance(raw_names, list) or not all(isinstance(item, str) for item in raw_names):
+            logger.warning("Active-policy tool_search returned malformed promoted names")
+            return self._tool_search_policy_error(request)
+
+        permitted_names = [item for item in raw_names if item in allowed]
+        sanitized_messages: list[ToolMessage] = []
+        for message in messages:
+            if not isinstance(message, ToolMessage) or message.name != _TOOL_SEARCH_NAME:
+                logger.warning("Active-policy tool_search returned an unexpected message shape")
+                return self._tool_search_policy_error(request)
+            content = message.content
+            if raw_names:
+                try:
+                    schemas = json.loads(content) if isinstance(content, str) else None
+                except json.JSONDecodeError:
+                    schemas = None
+                if not isinstance(schemas, list):
+                    logger.warning("Active-policy tool_search returned schemas that could not be filtered")
+                    return self._tool_search_policy_error(request)
+                filtered_schemas = [schema for schema in schemas if isinstance(schema, dict) and (schema.get("name") in permitted_names or (isinstance(schema.get("function"), dict) and schema["function"].get("name") in permitted_names))]
+                content = json.dumps(filtered_schemas, indent=2, ensure_ascii=False) if filtered_schemas else "No tools found matching the active skill policy."
+            sanitized_messages.append(message.model_copy(update={"content": content}))
+
+        sanitized_update = dict(result.update)
+        sanitized_update["promoted"] = {**promoted, "names": permitted_names}
+        sanitized_update["messages"] = sanitized_messages
+        return Command(
+            graph=result.graph,
+            update=sanitized_update,
+            resume=result.resume,
+            goto=result.goto,
         )
 
     @override
@@ -270,10 +342,11 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         policy = self._active_policy(request)
         if not policy[1]:
             return handler(request)
-        blocked = self._blocked_tool_message(request, policy=policy)
+        allowed = self._allowed_names(request, policy=policy)
+        blocked = self._blocked_tool_message(request, allowed=allowed)
         if blocked is not None:
             return blocked
-        return handler(request)
+        return self._filter_tool_search_result(request, handler(request), allowed=allowed)
 
     @override
     async def awrap_tool_call(
@@ -284,7 +357,8 @@ class SkillToolPolicyMiddleware(AgentMiddleware[AgentState]):
         policy = self._active_policy(request)
         if not policy[1]:
             return await handler(request)
-        blocked = await asyncio.to_thread(self._blocked_tool_message, request, policy=policy)
+        allowed = await asyncio.to_thread(self._allowed_names, request, policy=policy)
+        blocked = self._blocked_tool_message(request, allowed=allowed)
         if blocked is not None:
             return blocked
-        return await handler(request)
+        return self._filter_tool_search_result(request, await handler(request), allowed=allowed)

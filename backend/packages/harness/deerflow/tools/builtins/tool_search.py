@@ -176,7 +176,8 @@ def build_deferred_tool_setup(candidate_tools: list[BaseTool], *, enabled: bool)
     """Build deferred-tool setup from one agent build's candidate tools.
 
     Lead agents pass their full configured tool list; ``SkillToolPolicyMiddleware``
-    later filters both model-visible schemas and execution for the active skill.
+    later filters model-visible schemas, execution, and ``tool_search`` results
+    for the active skill while keeping the discovery tool itself available.
     Subagents may pass a statically policy-filtered list because their configured
     skills are loaded at startup. The downstream deferred-schema middleware still
     hides unpromoted MCP schemas in either case.

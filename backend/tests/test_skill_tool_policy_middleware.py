@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from langchain.agents.middleware.types import ModelRequest
 from langchain.tools import ToolRuntime
 from langchain_core.messages import HumanMessage
@@ -85,6 +86,32 @@ def _middleware(skills, *, available_skills=None):
 
 def _tool_names(request):
     return [tool.name for tool in request.tools]
+
+
+@pytest.mark.parametrize(
+    "middleware_class_path",
+    [
+        "deerflow.agents.middlewares.skill_activation_middleware.SkillActivationMiddleware",
+        "deerflow.agents.middlewares.skill_tool_policy_middleware.SkillToolPolicyMiddleware",
+    ],
+)
+def test_skill_policy_middlewares_require_shared_slash_source_token(middleware_class_path):
+    module_name, class_name = middleware_class_path.rsplit(".", 1)
+    module = __import__(module_name, fromlist=[class_name])
+    middleware_class = getattr(module, class_name)
+
+    with pytest.raises(TypeError, match="slash_source_owner_token"):
+        middleware_class()
+
+
+@pytest.mark.parametrize("invalid_token", [None, "", 7])
+def test_skill_policy_middlewares_reject_invalid_slash_source_tokens(invalid_token):
+    from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
+    from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
+
+    for middleware_class in (SkillActivationMiddleware, SkillToolPolicyMiddleware):
+        with pytest.raises(ValueError, match="non-empty string"):
+            middleware_class(slash_source_owner_token=invalid_token)
 
 
 def test_passive_enabled_skill_does_not_filter_lead_tools():
@@ -275,11 +302,33 @@ def test_explicit_empty_allowed_tools_keeps_only_framework_tools():
     restricted = _skill("restricted", [])
     middleware = _middleware([restricted])
     request = ModelRequestStub(
-        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        [
+            NamedTool("task"),
+            NamedTool("read_file"),
+            NamedTool("review_skill_package"),
+            NamedTool("tool_search"),
+            NamedTool("describe_skill"),
+        ],
         state={"skill_context": [{"path": restricted.get_container_file_path()}]},
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+    assert _tool_names(middleware._filter_model_request(request)) == [
+        "read_file",
+        "review_skill_package",
+        "tool_search",
+        "describe_skill",
+    ]
+
+
+def test_active_skill_keeps_framework_discovery_tools():
+    restricted = _skill("restricted", ["calc"])
+    middleware = _middleware([restricted])
+    request = ModelRequestStub(
+        [NamedTool("calc"), NamedTool("tool_search"), NamedTool("describe_skill")],
+        state={"skill_context": [{"path": restricted.get_container_file_path()}]},
+    )
+
+    assert _tool_names(middleware._filter_model_request(request)) == ["calc", "tool_search", "describe_skill"]
 
 
 def test_custom_agent_allowlist_rejects_all_out_of_scope_active_skills():
@@ -355,22 +404,44 @@ def test_unknown_skill_context_path_is_skipped_while_resolvable_skills_apply():
 def test_all_unknown_active_paths_fail_closed_to_framework_tools():
     middleware = _middleware([])
     request = ModelRequestStub(
-        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        [
+            NamedTool("task"),
+            NamedTool("read_file"),
+            NamedTool("review_skill_package"),
+            NamedTool("tool_search"),
+            NamedTool("describe_skill"),
+        ],
         state={"skill_context": [{"path": "/mnt/skills/public/missing/SKILL.md"}]},
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+    assert _tool_names(middleware._filter_model_request(request)) == [
+        "read_file",
+        "review_skill_package",
+        "tool_search",
+        "describe_skill",
+    ]
 
 
 def test_all_disabled_active_paths_fail_closed_to_framework_tools():
     disabled = _skill("disabled", ["task"], enabled=False)
     middleware = _middleware([disabled])
     request = ModelRequestStub(
-        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        [
+            NamedTool("task"),
+            NamedTool("read_file"),
+            NamedTool("review_skill_package"),
+            NamedTool("tool_search"),
+            NamedTool("describe_skill"),
+        ],
         state={"skill_context": [{"path": disabled.get_container_file_path()}]},
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+    assert _tool_names(middleware._filter_model_request(request)) == [
+        "read_file",
+        "review_skill_package",
+        "tool_search",
+        "describe_skill",
+    ]
 
 
 def test_async_passive_tool_call_skips_storage_and_thread_offload():
@@ -651,8 +722,19 @@ def test_active_policy_load_failure_fails_closed_to_framework_tools():
 
     middleware._storage = fail_storage
     request = ModelRequestStub(
-        [NamedTool("task"), NamedTool("read_file"), NamedTool("review_skill_package")],
+        [
+            NamedTool("task"),
+            NamedTool("read_file"),
+            NamedTool("review_skill_package"),
+            NamedTool("tool_search"),
+            NamedTool("describe_skill"),
+        ],
         state={"skill_context": [{"path": "/mnt/skills/public/restricted/SKILL.md"}]},
     )
 
-    assert _tool_names(middleware._filter_model_request(request)) == ["read_file", "review_skill_package"]
+    assert _tool_names(middleware._filter_model_request(request)) == [
+        "read_file",
+        "review_skill_package",
+        "tool_search",
+        "describe_skill",
+    ]
