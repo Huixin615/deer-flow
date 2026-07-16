@@ -1,0 +1,41 @@
+CHANGELOG.md
+  s_34756b16e58910::t_0c6cfd735c4d17 12-16,48-51,67-69,590-591
+README.md
+  s_34756b16e58910::t_507d5c22ed098f 651
+backend/AGENTS.md
+  s_34756b16e58910::t_916e0871571161 244,454
+backend/packages/harness/deerflow/agents/middlewares/skill_activation_middleware.py
+  s_34756b16e58910::t_18e552762f7cd5 96,99-100,104
+backend/packages/harness/deerflow/agents/middlewares/skill_tool_policy_middleware.py
+  s_34756b16e58910::t_dedb884e431aa5 6,37,58,61-62,66,227,239-307,345-346,349,360-361,364
+backend/packages/harness/deerflow/skills/tool_policy.py
+  s_34756b16e58910::t_d495410b8551af 14-25
+backend/packages/harness/deerflow/tools/builtins/tool_search.py
+  s_34756b16e58910::t_433e75c3c81024 179-180
+backend/tests/test_skill_policy_deferred_discovery.py
+  s_34756b16e58910::t_9d7f239ad53c7d 1-341
+backend/tests/test_skill_request_scoped_secrets.py
+  s_34756b16e58910::t_8019eb312481bb 23-24,371-381,387,471,568,602,614,643,697,1068,1107-1110,1133-1136,1218
+backend/tests/test_skill_tool_policy_middleware.py
+  s_34756b16e58910::t_9fc3563bd4de56 7,91-116,305-327,331,407-413,417-422,429-435,439-444,725-731,735-740
+backend/tests/test_slash_skills.py
+  s_34756b16e58910::t_91b8be9c302727 16-17,122,148,179,207,249,296,341,364,390,409,437,461,491,514,530,551,578,593,611,631,695,711,727
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "fac5f5f8fdb8c2bc76d0e474ce3cde993cc02cee",
+  "prompts": {},
+  "sessions": {
+    "s_34756b16e58910": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5315-e064-7022-a2a6-5587ff78e775",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
