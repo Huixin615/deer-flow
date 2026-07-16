@@ -1,0 +1,25 @@
+frontend/src/core/streamdown/plugins.ts
+  s_ec667dea73fd28::t_ceea8525ab556d 15-19,21,29
+frontend/tests/unit/components/workspace/messages/markdown-content.test.ts
+  s_ec667dea73fd28::t_1d11fd0739be33 86-100
+frontend/tests/unit/core/streamdown/plugins.test.ts
+  s_ec667dea73fd28::t_a1f3d5edd61c53 3,5-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "681d64ba24a8ead9d9cb1b14e665eff9b606b8be",
+  "prompts": {},
+  "sessions": {
+    "s_ec667dea73fd28": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f69b2-db27-7860-b25b-8538d18457da",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
