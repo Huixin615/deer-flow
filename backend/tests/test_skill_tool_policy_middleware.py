@@ -169,6 +169,41 @@ def test_slash_activated_skill_filters_first_model_call_and_task():
     assert _tool_names(filtered) == ["read_file", "review_skill_package"]
 
 
+@pytest.mark.parametrize("active_source", ["slash", "skill_context"])
+def test_restrictive_skill_explicitly_allows_task_schema_and_execution(active_source):
+    skill = _skill("delegating", ["task"])
+    context = {}
+    state = {}
+    if active_source == "slash":
+        write_slash_skill_source_path(
+            context,
+            skill.get_container_file_path(),
+            owner_token=_SLASH_SOURCE_OWNER_TOKEN,
+        )
+    else:
+        state = {
+            "skill_context": [
+                {
+                    "name": skill.name,
+                    "path": skill.get_container_file_path(),
+                }
+            ]
+        }
+
+    middleware = _middleware([skill])
+    model_request = ModelRequestStub(
+        [NamedTool("task"), NamedTool("web_search")],
+        state=state,
+        context=context,
+    )
+
+    filtered = middleware.wrap_model_call(model_request, lambda request: request)
+
+    assert _tool_names(filtered) == ["task"]
+    tool_request = ToolRequestStub("task", state=state, context=context)
+    assert middleware.wrap_tool_call(tool_request, lambda _: "delegated") == "delegated"
+
+
 def test_slash_activated_skill_policy_dominates_captured_skill_context():
     slash_skill = _skill("content-research", ["web_search"])
     captured_skill = _skill("content-article-generation", ["write_file"])
