@@ -540,8 +540,10 @@ malformed skills retain the existing parser behavior of being skipped and
 logged. The endpoint returns `401` for unauthenticated callers, `403` for
 non-admin users, and a generic `500` if the invalidation mechanism itself
 fails or the process-local background scan does not finish within the cache
-refresh timeout. A timed-out scan continues in its daemon worker and can still
-populate the process cache when it finishes.
+refresh timeout. A loader-level failure, such as an unavailable mounted root,
+does not publish an empty catalog: the last successfully loaded process cache
+remains available. A timed-out scan continues in its daemon worker and can
+still populate the process cache when it finishes.
 
 The scope is deliberately process-local. Each Uvicorn worker or Kubernetes Pod
 must be called directly; repeated requests through a load-balanced Service do

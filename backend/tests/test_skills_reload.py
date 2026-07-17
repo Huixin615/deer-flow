@@ -60,6 +60,7 @@ def _reset_prompt_cache_state() -> None:
         prompt_module._enabled_skills_refresh_active = False
         prompt_module._enabled_skills_refresh_version = 0
         prompt_module._enabled_skills_refresh_event.clear()
+        prompt_module._enabled_skills_refresh_waiters.clear()
 
 
 def test_admin_can_reload_skills(monkeypatch) -> None:
@@ -93,6 +94,51 @@ def test_reload_failure_returns_generic_error(monkeypatch) -> None:
     assert response.status_code == 500
     assert response.json() == {"detail": "Failed to invalidate skills cache."}
     assert "/srv/company/minio" not in response.text
+
+
+def test_reload_worker_failure_returns_500_preserves_last_good_cache_and_can_retry(monkeypatch, tmp_path: Path) -> None:
+    _write_skill(tmp_path, "cached-skill", "last known good description")
+    storage = LocalSkillStorage(host_path=str(tmp_path))
+    last_good_skills = storage.load_skills(enabled_only=True)
+
+    _write_skill(tmp_path, "cached-skill", "recovered description")
+    recovered_skills = storage.load_skills(enabled_only=True)
+    load_count = 0
+
+    def _load_enabled_skills():
+        nonlocal load_count
+        load_count += 1
+        if load_count == 1:
+            raise PermissionError("mounted skills unavailable at /srv/company/minio")
+        return recovered_skills
+
+    monkeypatch.setattr(prompt_module, "_load_enabled_skills_sync", _load_enabled_skills)
+    _reset_prompt_cache_state()
+    with prompt_module._enabled_skills_lock:
+        prompt_module._enabled_skills_cache = last_good_skills
+
+    try:
+        app = _make_app(system_role="admin")
+        with TestClient(app) as client:
+            failed_response = client.post("/api/skills/reload")
+
+            assert failed_response.status_code == 500
+            assert failed_response.json() == {"detail": "Failed to invalidate skills cache."}
+            assert "mounted skills unavailable" not in failed_response.text
+            assert "/srv/company/minio" not in failed_response.text
+
+            with prompt_module._enabled_skills_lock:
+                assert prompt_module._enabled_skills_cache == last_good_skills
+                assert prompt_module._enabled_skills_refresh_active is False
+
+            recovered_response = client.post("/api/skills/reload")
+
+        assert recovered_response.status_code == 200
+        assert recovered_response.json() == _SUCCESS_RESPONSE
+        with prompt_module._enabled_skills_lock:
+            assert prompt_module._enabled_skills_cache == recovered_skills
+    finally:
+        _reset_prompt_cache_state()
 
 
 def test_reload_invalidates_all_user_caches_and_rescans_external_changes(monkeypatch, tmp_path: Path) -> None:
