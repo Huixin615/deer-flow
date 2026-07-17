@@ -1,0 +1,23 @@
+backend/tests/test_lead_agent_skills.py
+  s_2ce382ef11c2ec::t_13e583c3388771 386-391,394,428-429
+backend/tests/test_skill_policy_deferred_discovery.py
+  s_2ce382ef11c2ec::t_669e68ae34a5d2 150-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "64132095f447a4ca278c0c395aea72bf3355cc25",
+  "prompts": {},
+  "sessions": {
+    "s_2ce382ef11c2ec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6a29-c611-78a3-8bc6-0d5ae52bc8f7",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
