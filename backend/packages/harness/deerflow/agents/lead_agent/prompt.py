@@ -171,18 +171,20 @@ def get_enabled_skills_for_config(app_config: AppConfig | None = None, user_id: 
                 # next eviction cycle.
                 _enabled_skills_by_config_cache.move_to_end(cache_key)
                 return list(cached_skills)
+        load_version = _enabled_skills_refresh_version
 
     if user_id:
         skills = list(get_or_new_user_skill_storage(user_id, app_config=app_config).load_skills(enabled_only=True))
     else:
         skills = list(get_or_new_skill_storage(app_config=app_config).load_skills(enabled_only=True))
     with _enabled_skills_lock:
-        _enabled_skills_by_config_cache[cache_key] = (app_config, skills)
-        # Evict the least-recently-used entries when we exceed the cap.
-        # The cap is intentionally small (256) so a long-running process
-        # cannot leak one entry per distinct (config, user) pair seen.
-        while len(_enabled_skills_by_config_cache) > _ENABLED_SKILLS_BY_CONFIG_CACHE_MAXSIZE:
-            _enabled_skills_by_config_cache.popitem(last=False)
+        if _enabled_skills_refresh_version == load_version:
+            _enabled_skills_by_config_cache[cache_key] = (app_config, skills)
+            # Evict the least-recently-used entries when we exceed the cap.
+            # The cap is intentionally small (256) so a long-running process
+            # cannot leak one entry per distinct (config, user) pair seen.
+            while len(_enabled_skills_by_config_cache) > _ENABLED_SKILLS_BY_CONFIG_CACHE_MAXSIZE:
+                _enabled_skills_by_config_cache.popitem(last=False)
     return list(skills)
 
 
@@ -210,7 +212,9 @@ def clear_skills_system_prompt_cache() -> None:
 
 
 async def refresh_skills_system_prompt_cache_async() -> None:
-    await asyncio.to_thread(_invalidate_enabled_skills_cache().wait)
+    refreshed = await asyncio.to_thread(_invalidate_enabled_skills_cache().wait, _ENABLED_SKILLS_REFRESH_WAIT_TIMEOUT_SECONDS)
+    if not refreshed:
+        raise TimeoutError("Timed out waiting for enabled skills cache refresh")
 
 
 def invalidate_user_skill_cache(user_id: str) -> None:
