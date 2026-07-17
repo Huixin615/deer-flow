@@ -147,6 +147,8 @@ def test_passive_empty_skill_policy_preserves_deferred_mcp_discovery_and_calling
 
     assert model.bound_tool_names[0] == ["tool_search"]
     assert "calc" in model.bound_tool_names[1]
+    # This tool remains hidden because it was not promoted, not because the passive
+    # skill applied a policy restriction.
     assert "denied_lookup" not in model.bound_tool_names[1]
     assert _CALC_CALLS == ["2 + 2"]
     assert result["promoted"] == {"catalog_hash": setup.catalog_hash, "names": ["calc"]}

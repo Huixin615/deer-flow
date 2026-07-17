@@ -383,9 +383,15 @@ def test_make_lead_agent_passive_empty_skill_policy_preserves_mcp_and_other_tool
 
     tag_mcp_tool(lightrag_query)
 
+    captured_deferred_setups = []
+
+    def capture_build_middlewares(*args, **kwargs):
+        captured_deferred_setups.append(kwargs["deferred_setup"])
+        return []
+
     monkeypatch.setattr(lead_agent_module, "_resolve_model_name", lambda x=None, **kwargs: "default-model")
     monkeypatch.setattr(lead_agent_module, "create_chat_model", lambda **kwargs: "model")
-    monkeypatch.setattr(lead_agent_module, "build_middlewares", lambda *args, **kwargs: [])
+    monkeypatch.setattr(lead_agent_module, "build_middlewares", capture_build_middlewares)
     monkeypatch.setattr(lead_agent_module, "apply_prompt_template", lambda **kwargs: "mock_prompt")
     monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
     monkeypatch.setattr(
@@ -419,6 +425,8 @@ def test_make_lead_agent_passive_empty_skill_policy_preserves_mcp_and_other_tool
 
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert {"bash", "read_file", "web_search", "lightrag_query", "tool_search", "describe_skill"} <= set(tool_names)
+    assert len(captured_deferred_setups) == 1
+    assert captured_deferred_setups[0].deferred_names == frozenset({"lightrag_query"})
 
 
 def test_make_lead_agent_fails_closed_when_skill_policy_load_fails(monkeypatch):
