@@ -1,0 +1,23 @@
+frontend/tests/e2e/thread-history.spec.ts
+  s_d47a7edc42b01d::t_471f3980911a29 139-141
+frontend/tests/unit/core/threads/message-merge.test.ts
+  s_d47a7edc42b01d::t_f9245361047cd0 99-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "7407d5afbed78c767d1eb83b4de2e93a06db5877",
+  "prompts": {},
+  "sessions": {
+    "s_d47a7edc42b01d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8498-fd91-71c2-9e69-360eb4535a32",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
