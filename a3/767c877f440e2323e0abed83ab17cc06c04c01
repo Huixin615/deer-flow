@@ -1,0 +1,573 @@
+CHANGELOG.md
+  s_d47a7edc42b01d::t_741e9eb46d1c3a 10-11,24,32,39,50-148,152-161,172,177-183,189-190,196-361,691,760,772,788,795,802,834,850,853-854,857-858,861,871-872,874,877,886,889-890,892,894,898-1046,1048,1050-1069,1071-1081,1083-1101
+backend/AGENTS.md
+  s_d47a7edc42b01d::t_db0cafc4cb5d1f 145,148-151,166-170,248-251,270-274,320-321,328-331,337,340,350,381-403,462-463,477,497,505,546,558,586,632,719,730,796,798,800
+backend/app/channels/commands.py
+  s_d47a7edc42b01d::t_6bbf3daa24a9ab 44-65,80
+backend/app/channels/dingtalk.py
+  s_d47a7edc42b01d::t_d1b459a1f58381 419-431
+backend/app/channels/feishu.py
+  s_d47a7edc42b01d::t_8190bf2fb17609 14,315,318-320,1063-1069,1071
+backend/app/channels/manager.py
+  s_d47a7edc42b01d::t_9fce5dcf9dab47 75-104,111-115,1208-1216,1678-1681,1697-1699,1871-1876
+backend/app/channels/slack.py
+  s_d47a7edc42b01d::t_2803078c6a002f 6,8,23-51,162
+backend/app/channels/wechat.py
+  s_d47a7edc42b01d::t_732e85c9e8422a 11,585-604,1460-1461,1463
+backend/app/gateway/app.py
+  s_d47a7edc42b01d::t_29805992808c89 11,20,186,307-323,340-343,511-513
+backend/app/gateway/auth/errors.py
+  s_d47a7edc42b01d::t_a18295f490e2e4 24
+backend/app/gateway/auth/oidc_state.py
+  s_d47a7edc42b01d::t_eea59d5d089082 35
+backend/app/gateway/auth/session_cookie.py
+  s_d47a7edc42b01d::t_8f2ad9db825cd9 1-110
+backend/app/gateway/auth/session_cookie_state.py
+  s_d47a7edc42b01d::t_1bbb1d635624fc 1-6
+backend/app/gateway/browser_capability.py
+  s_d47a7edc42b01d::t_d6dbdf5b7d9808 1-72
+backend/app/gateway/csrf_middleware.py
+  s_d47a7edc42b01d::t_39551c355766f9 18,185-198,232-236,239,244,251
+backend/app/gateway/deps.py
+  s_d47a7edc42b01d::t_e4b42463ee7979 30,50-57,59,61,63-66,68,85-87
+backend/app/gateway/github/dispatcher.py
+  s_d47a7edc42b01d::t_46cd9b773ba1ab 405-416
+backend/app/gateway/routers/__init__.py
+  s_d47a7edc42b01d::t_b57fd46e8b0ba5 4,19
+backend/app/gateway/routers/artifacts.py
+  s_d47a7edc42b01d::t_7fc4e5b55c3f4e 126-133,147-150,244-256,260
+backend/app/gateway/routers/auth.py
+  s_d47a7edc42b01d::t_f50ccec2ef8fb4 12,34-35,37,131,142,156,158,293,310,318-342,349-350,352-357,367,375-379,434-435,501,526,563,590,595,600,655,721,837
+backend/app/gateway/routers/browser.py
+  s_d47a7edc42b01d::t_f0caf1b3308dda 1-467
+backend/app/gateway/routers/features.py
+  s_d47a7edc42b01d::t_c9c9d0ac702de7 12,25-30,35,46,49
+backend/app/gateway/routers/github_webhooks.py
+  s_d47a7edc42b01d::t_a7a48b9da9b049 186-202,276-282,302-304,325,329-336,347
+backend/app/gateway/routers/runs.py
+  s_d47a7edc42b01d::t_dcb0929e8d51b9 29,112-113
+backend/app/gateway/routers/skills.py
+  s_d47a7edc42b01d::t_c6ee2d67e68066 6,13,74-81,196-217,446,466
+backend/app/gateway/routers/thread_runs.py
+  s_d47a7edc42b01d::t_0b3ea850907d4e 711-713,913-914,957-958
+backend/app/gateway/routers/threads.py
+  s_d47a7edc42b01d::t_baa22514f8ad1f 504-515
+backend/app/gateway/routers/uploads.py
+  s_d47a7edc42b01d::t_af27ac86b925e9 382-388,400-404
+backend/app/gateway/services.py
+  s_d47a7edc42b01d::t_b997d4ae5154a1 213-221,267-269,317,324-327,330-349,469,496,737-742
+backend/app/gateway/trace_middleware.py
+  s_d47a7edc42b01d::t_f2039fb2a90764 12-18,48,51-62
+backend/docs/API.md
+  s_d47a7edc42b01d::t_757da3cb755ebf 509-553
+backend/docs/CONFIGURATION.md
+  s_d47a7edc42b01d::t_02ba65453d72dc 251
+backend/docs/TUI.md
+  s_d47a7edc42b01d::t_6292043f9860b4 63,67-68
+backend/packages/harness/deerflow/agents/lead_agent/agent.py
+  s_d47a7edc42b01d::t_518f9d48202706 16-21,36,366-368,407-410,418-420
+backend/packages/harness/deerflow/agents/lead_agent/prompt.py
+  s_d47a7edc42b01d::t_0add060d3f11c8 8,48-60,80,83,85-86,90-92,95-99,110-111,122-123,129-130,133,137,197,204-210,238-243
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deer_mem.py
+  s_d47a7edc42b01d::t_76b6a46d9b2292 37,39,60-64,69-86,153,163-164
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/config.py
+  s_d47a7edc42b01d::t_d81571f0d5efa8 182-190
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/message_patterns/correction.yaml
+  s_d47a7edc42b01d::t_15c2f85b5c87f1 1-26
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/message_patterns/reinforcement.yaml
+  s_d47a7edc42b01d::t_14ca2ad045f089 1-36
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/message_processing.py
+  s_d47a7edc42b01d::t_9c925a614752d2 5,9,12-15,17-94,212-221,226,232-240,245
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/prompt.py
+  s_d47a7edc42b01d::t_31028bdf4d52b5 11,14-16,19-26,34-84,86-89,91-187,358,770
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/prompts/consolidation.yaml
+  s_d47a7edc42b01d::t_9f59e8f0d3f07d 1-25
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/prompts/fact_extraction.yaml
+  s_d47a7edc42b01d::t_be187f04ec3225 1-29
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/prompts/memory_update.chat.yaml
+  s_d47a7edc42b01d::t_a96d81440e9291 1-147
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/prompts/staleness_review.yaml
+  s_d47a7edc42b01d::t_f6e96f9faecff5 1-37
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/updater.py
+  s_d47a7edc42b01d::t_c74274d4800760 19-20,174-178,393-440,453-454,483-487,495-497,521,557-559,581,587,615,623-624,629,776,797,808-809,812-819,1179-1181,1211-1212,1243-1246,1335-1382
+backend/packages/harness/deerflow/agents/middlewares/configured_extensions.py
+  s_d47a7edc42b01d::t_a1829fc0ba3a6d 1-34
+backend/packages/harness/deerflow/agents/middlewares/dangling_tool_call_middleware.py
+  s_d47a7edc42b01d::t_1f4bfdd92e7bbe 40,47-131,356-422,429-430,432,437,448
+backend/packages/harness/deerflow/agents/middlewares/llm_error_handling_middleware.py
+  s_d47a7edc42b01d::t_d8f20a48c2aff3 7,10,67-78,99-110,127-367,374-381,389-405,413,416-421,423-430,505-511,541-620,624-644,646-655,684-685,712-719,728-731,734,755,758,767,769-770,774,778,788,791-795,814,817,826,828-829,833,837,847,850-854
+backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py
+  s_d47a7edc42b01d::t_fc3905a6c261e9 360,722,731
+backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py
+  s_d47a7edc42b01d::t_c3cb9351f71725 372-375
+backend/packages/harness/deerflow/agents/middlewares/tool_result_meta.py
+  s_d47a7edc42b01d::t_9c9580fbbe9ebb 84-129,178-221,283-284
+backend/packages/harness/deerflow/authz/__init__.py
+  s_d47a7edc42b01d::t_dcb79dbc718dd4 4,6-7,16-19
+backend/packages/harness/deerflow/authz/adapter.py
+  s_d47a7edc42b01d::t_4e1b25f7f18094 11-15,20-21,32-38,47,52,58-69,71
+backend/packages/harness/deerflow/authz/principal.py
+  s_d47a7edc42b01d::t_f4256d463fa8ac 1-62
+backend/packages/harness/deerflow/authz/provider.py
+  s_d47a7edc42b01d::t_1d9f5c014039d5 31,35-37
+backend/packages/harness/deerflow/authz/rbac.py
+  s_d47a7edc42b01d::t_450ff016b99e62 1-254
+backend/packages/harness/deerflow/authz/runtime.py
+  s_d47a7edc42b01d::t_fc4dd03509498a 1-50
+backend/packages/harness/deerflow/client.py
+  s_d47a7edc42b01d::t_9d97b0d9fb48da 1120-1121,1187,1204,1407-1408,1426-1431,1434,1436,1450-1454
+backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py
+  s_d47a7edc42b01d::t_9944f928a48959 15,23,50-58,74-87,164-171,184-194,198-201,204-216,226-230,289-293,311-580,583-626,630-634,636-638,640-642,650-655,661-662,666-680,682-683,687-699,701,705-711,846-847,850-973,986-1006,1010,1016-1057,1118-1122,1148-1181,1200-1205,1218-1228,1230-1239,1264-1282,1285-1315,1323-1343,1345-1346,1392,1402-1414,1427-1443,1451-1483,1485-1515,1523,1671-1674,1733-1735,1740-1746,1757,1798-1811,1827-1853,1866-1873,1875-1879,1892-1895,1906-1916
+backend/packages/harness/deerflow/community/aio_sandbox/local_backend.py
+  s_d47a7edc42b01d::t_08e6d2ed53d780 203-207,611-620,627,630-634
+backend/packages/harness/deerflow/community/aio_sandbox/ownership/__init__.py
+  s_d47a7edc42b01d::t_9263af821fc201 1-23
+backend/packages/harness/deerflow/community/aio_sandbox/ownership/base.py
+  s_d47a7edc42b01d::t_99ce0131ebdeff 1-188
+backend/packages/harness/deerflow/community/aio_sandbox/ownership/factory.py
+  s_d47a7edc42b01d::t_3b410af78d112d 1-108
+backend/packages/harness/deerflow/community/aio_sandbox/ownership/memory.py
+  s_d47a7edc42b01d::t_629b9d1aacb9fe 1-106
+backend/packages/harness/deerflow/community/aio_sandbox/ownership/redis.py
+  s_d47a7edc42b01d::t_67a259e9128d71 1-214
+backend/packages/harness/deerflow/community/browser_automation/__init__.py
+  s_d47a7edc42b01d::t_c2d94de255e795 1-49
+backend/packages/harness/deerflow/community/browser_automation/session.py
+  s_d47a7edc42b01d::t_1e265885bdf9b8 1-1022
+backend/packages/harness/deerflow/community/browser_automation/tools.py
+  s_d47a7edc42b01d::t_69e0638b86ecc5 1-448
+backend/packages/harness/deerflow/community/browserless/browserless_client.py
+  s_d47a7edc42b01d::t_2c92b05c5a24b2 10-16,53-99,113-114,161-165
+backend/packages/harness/deerflow/community/browserless/tools.py
+  s_d47a7edc42b01d::t_32f2109f426375 21,176-177,181-182,227,237-238,240-241
+backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py
+  s_d47a7edc42b01d::t_b7acc31863d015 285,294,306,401,410,422,523-553,927-934,1011-1016,1022-1036,1062,1066,1084,1088
+backend/packages/harness/deerflow/community/serper/tools.py
+  s_d47a7edc42b01d::t_37d1e34a0f4862 152-155
+backend/packages/harness/deerflow/config/app_config.py
+  s_d47a7edc42b01d::t_85cae66d9b7a7d 20-21,68-124,235,381-385,387-391
+backend/packages/harness/deerflow/config/auth_config.py
+  s_d47a7edc42b01d::t_84423be00c18ef 70-83,88
+backend/packages/harness/deerflow/config/database_config.py
+  s_d47a7edc42b01d::t_da032b3b5d9086 66-75,111-113
+backend/packages/harness/deerflow/config/extensions_config.py
+  s_d47a7edc42b01d::t_98dee22675b23e 135-138,150-153,163,176-198,205-206,226-228
+backend/packages/harness/deerflow/config/file_signature.py
+  s_d47a7edc42b01d::t_3f15923b0ea068 1-55
+backend/packages/harness/deerflow/config/memory_config.py
+  s_d47a7edc42b01d::t_33f09e8f66abdd 124-153
+backend/packages/harness/deerflow/config/sandbox_config.py
+  s_d47a7edc42b01d::t_47f609bfe9b1cc 1-2,5-45,89-90,126-132
+backend/packages/harness/deerflow/config/skill_evolution_config.py
+  s_d47a7edc42b01d::t_e333c75cbe07fa 15-18
+backend/packages/harness/deerflow/constants.py
+  s_d47a7edc42b01d::t_b91660a34004fb 4-10
+backend/packages/harness/deerflow/guardrails/middleware.py
+  s_d47a7edc42b01d::t_ed65bc561dba0c 15,57-59
+backend/packages/harness/deerflow/guardrails/provider.py
+  s_d47a7edc42b01d::t_f01e3211d1da06 25-30
+backend/packages/harness/deerflow/mcp/cache.py
+  s_d47a7edc42b01d::t_96faaba1458d87 9-11,19-20,32-54,58-63
+backend/packages/harness/deerflow/models/mindie_provider.py
+  s_d47a7edc42b01d::t_7bcc0c455cb0c0 46-51,53
+backend/packages/harness/deerflow/persistence/engine.py
+  s_d47a7edc42b01d::t_1da65b1e3d6d74 19-23,30-50,90-91,101-102,166-171,197-205,224-225
+backend/packages/harness/deerflow/runtime/runs/worker.py
+  s_d47a7edc42b01d::t_a346890b26ce26 59-63,370,373-376
+backend/packages/harness/deerflow/sandbox/tools.py
+  s_d47a7edc42b01d::t_2c742c8f839a2a 1613-1616
+backend/packages/harness/deerflow/skills/installer.py
+  s_d47a7edc42b01d::t_7fa6c3f07bef59 65-79,93-94,137,145-147,151,156-166
+backend/packages/harness/deerflow/skills/security_scanner.py
+  s_d47a7edc42b01d::t_fb38d162570ccf 25-33,99,101-111,126-127,144,150-153
+backend/packages/harness/deerflow/skills/skillscan/orchestrator.py
+  s_d47a7edc42b01d::t_b5f4e2898d1a1d 21,47-52,256-257,382,404-413,567-578,674-683,694-714,743-1216
+backend/packages/harness/deerflow/subagents/executor.py
+  s_d47a7edc42b01d::t_cdb715fa3e35e3 10,26,413-414,466-470,796-799
+backend/packages/harness/deerflow/tools/builtins/task_tool.py
+  s_d47a7edc42b01d::t_34cd5b4be3310b 15,345-349,395-396
+backend/packages/harness/deerflow/tools/builtins/tool_search.py
+  s_d47a7edc42b01d::t_ff01e767804b4b 287-289
+backend/packages/harness/deerflow/tools/skill_manage_tool.py
+  s_d47a7edc42b01d::t_beded6c0758e66 67-69
+backend/packages/harness/deerflow/tools/tools.py
+  s_d47a7edc42b01d::t_bfd2a4f2375b0f 131-135
+backend/packages/harness/deerflow/trace_context.py
+  s_d47a7edc42b01d::t_32be8c657a3b7b 20-23,72-99
+backend/packages/harness/deerflow/tui/app.py
+  s_d47a7edc42b01d::t_0549cecabd06d7 39,356-358,361-367,372-374,379-381,565
+backend/packages/harness/deerflow/tui/command_registry.py
+  s_d47a7edc42b01d::t_8bf88941449338 39
+backend/packages/harness/deerflow/tui/view_state.py
+  s_d47a7edc42b01d::t_fece55dbcc3f76 206
+backend/packages/harness/deerflow/utils/file_conversion.py
+  s_d47a7edc42b01d::t_40195756f03e1a 138,147-150,164
+backend/packages/harness/deerflow/workspace_changes/api.py
+  s_d47a7edc42b01d::t_c38db8b068b658 11
+backend/packages/harness/deerflow/workspace_changes/diff.py
+  s_d47a7edc42b01d::t_bf34e99a0bc84e 26,41-42,78-80,91,116-124,178,201-206
+backend/packages/harness/deerflow/workspace_changes/recorder.py
+  s_d47a7edc42b01d::t_0f620f1db46bb2 41-76,84-104,115,129,150,161,164,166
+backend/packages/harness/deerflow/workspace_changes/scanner.py
+  s_d47a7edc42b01d::t_e6e672beea5b03 9-10,26-29,130-141,242-276
+backend/packages/harness/deerflow/workspace_changes/types.py
+  s_d47a7edc42b01d::t_5fbbd318cdcbf7 10-11,48-49,75-77,88,105
+backend/packages/harness/pyproject.toml
+  s_d47a7edc42b01d::t_cfec9fa672603d 71-74
+backend/pyproject.toml
+  s_d47a7edc42b01d::t_41e9efd902699b 32
+backend/tests/blocking_io/test_aio_sandbox_get.py
+  s_d47a7edc42b01d::t_f3506dde5cc802 1-155
+backend/tests/blocking_io/test_artifacts_router.py
+  s_d47a7edc42b01d::t_b7474eb8171ccb 4-19,33,71,76-79,81-82
+backend/tests/blocking_io/test_sandbox_release.py
+  s_d47a7edc42b01d::t_e1840c0c2e73d8 1-141
+backend/tests/blocking_io/test_skills_reload.py
+  s_d47a7edc42b01d::t_a6f362994e02dc 1-39
+backend/tests/blocking_io/test_workspace_changes_recorder.py
+  s_d47a7edc42b01d::t_e54a09c00badf3 1-209
+backend/tests/manual_browser_live_check.py
+  s_d47a7edc42b01d::t_5dccabd9572484 1-171
+backend/tests/monocle/README.md
+  s_d47a7edc42b01d::t_8d180eadb8709c 1-126
+backend/tests/monocle/_helpers.py
+  s_d47a7edc42b01d::t_ed0333e10299e7 1-42
+backend/tests/monocle/conftest.py
+  s_d47a7edc42b01d::t_9cd0d60d575aa8 1-42
+backend/tests/monocle/requirements.txt
+  s_d47a7edc42b01d::t_06d0bdf50bd0d1 1-13
+backend/tests/monocle/test_deerflow.py
+  s_d47a7edc42b01d::t_44ad1a663004f6 1-113
+backend/tests/monocle/traces/web_research_ev_battery.json
+  s_d47a7edc42b01d::t_a93979c85fe360 1-918
+backend/tests/test_additional_channel_connections.py
+  s_d47a7edc42b01d::t_cb4823a971c687 63-79
+backend/tests/test_aio_sandbox_local_backend.py
+  s_d47a7edc42b01d::t_5ba96fec92c3a3 336-376
+backend/tests/test_aio_sandbox_provider.py
+  s_d47a7edc42b01d::t_55da472343e410 48-58,62,64-67,70-74,452-455,677-681,686-689
+backend/tests/test_app_config_reload.py
+  s_d47a7edc42b01d::t_631874a75d58ee 107-114,129-201,614-673
+backend/tests/test_artifacts_router.py
+  s_d47a7edc42b01d::t_50c5062bdd4232 93-146
+backend/tests/test_auth_type_system.py
+  s_d47a7edc42b01d::t_4046af758f5f4f 637-761,794-815,834-1014,1095-1096,1106,1119-1159
+backend/tests/test_authorization_principal.py
+  s_d47a7edc42b01d::t_5d5adf0b935c6e 1-146
+backend/tests/test_authorization_provider.py
+  s_d47a7edc42b01d::t_1741971e0a381d 212-214,219-220,227-229,234-235,267-268,285-294,301-305,310-312,314-333,353-444
+backend/tests/test_authorization_runtime.py
+  s_d47a7edc42b01d::t_21d0f8d0e21faf 1-211
+backend/tests/test_browser_automation.py
+  s_d47a7edc42b01d::t_19d19593ea5d9e 1-1066
+backend/tests/test_browser_router.py
+  s_d47a7edc42b01d::t_becc078f455138 1-271
+backend/tests/test_browserless_client.py
+  s_d47a7edc42b01d::t_44e7b8f740e8f1 10,25-33,47,55-115,326-332,339,345,357,391-397,404-508
+backend/tests/test_channel_user_id_env.py
+  s_d47a7edc42b01d::t_4d1a98c2511318 4-5,54-65,68-72,78-79,81-90,92,95,98,211
+backend/tests/test_channels.py
+  s_d47a7edc42b01d::t_916885df247ddd 40-58,632-645,1075-1415,1421-1425,1434-1439,1444,1448,1452,1461-1466,5314-5457,7300-7403
+backend/tests/test_client.py
+  s_d47a7edc42b01d::t_b5467b0c6ed338 22,1433,1435,1495,1758-1759,1797-1865,2217,2219,2246,2754-2764,2774,3533-3534
+backend/tests/test_client_e2e.py
+  s_d47a7edc42b01d::t_c9024dae46c3aa 705,728,733,753-754
+backend/tests/test_config_version.py
+  s_d47a7edc42b01d::t_cfdacb45ecaa1b 126-190
+backend/tests/test_dangling_tool_call_middleware.py
+  s_d47a7edc42b01d::t_04f3545d65d7d7 730-1111
+backend/tests/test_detect_uv_extras.py
+  s_d47a7edc42b01d::t_8c765a46d4106f 152-167
+backend/tests/test_dingtalk_channel.py
+  s_d47a7edc42b01d::t_9b4a803c9cba4e 337-432
+backend/tests/test_e2b_sandbox_provider.py
+  s_d47a7edc42b01d::t_37a06eedfdba1c 461-465,473,558-562,566-620
+backend/tests/test_features_router.py
+  s_d47a7edc42b01d::t_e01ac481e421c4 2,11,14-21,30,37-73
+backend/tests/test_feishu_parser.py
+  s_d47a7edc42b01d::t_93df1f5e89d318 682-731
+backend/tests/test_file_signature.py
+  s_d47a7edc42b01d::t_ada402e5a28a12 1-77
+backend/tests/test_gateway_runtime_cleanup.py
+  s_d47a7edc42b01d::t_cb244ffefe9194 15-44,137-168
+backend/tests/test_gateway_services.py
+  s_d47a7edc42b01d::t_49e752efd163f9 9,1066,1090-1093,1147,1179-1182,1194,1197,1226-1311,1479-1635
+backend/tests/test_github_dispatcher.py
+  s_d47a7edc42b01d::t_792397dcdc1a63 1040,1051-1053,1185-1193,1195-1197,1206-1207,1209-1216
+backend/tests/test_github_webhooks.py
+  s_d47a7edc42b01d::t_0b53fd1b9a542e 545-546,549-556,559,618-619,680-682
+backend/tests/test_guardrail_middleware.py
+  s_d47a7edc42b01d::t_5a02db4ad86183 547-549,565,572-574,585-597
+backend/tests/test_lead_agent_model_resolution.py
+  s_d47a7edc42b01d::t_5b6b3d4f60162f 12,24,107-123,693-728,781-860
+backend/tests/test_lead_agent_prompt.py
+  s_d47a7edc42b01d::t_d999c960dffb03 22
+backend/tests/test_lead_agent_skills.py
+  s_d47a7edc42b01d::t_b52b16e066e1da 370,373-374,377-390,394,397-410,414-416,427-470
+backend/tests/test_llm_error_handling_middleware.py
+  s_d47a7edc42b01d::t_af6aed7051daac 4-7,18,22-41,64-77,79-84,86-87,866-2017
+backend/tests/test_local_registration_gate.py
+  s_d47a7edc42b01d::t_2c548c04c8ade5 1-166
+backend/tests/test_loop_detection_middleware.py
+  s_d47a7edc42b01d::t_64a50a96a0444d 1086-1132
+backend/tests/test_mcp_cache.py
+  s_d47a7edc42b01d::t_978b5da460b032 228-240,255-288
+backend/tests/test_memory_consolidation.py
+  s_d47a7edc42b01d::t_3fc064682a584b 33,98-104,906-1418,1480-1481,1505-1506,1529-1530
+backend/tests/test_memory_staleness_review.py
+  s_d47a7edc42b01d::t_f61c45afe28e15 29-30,129-187,228-298,348-357,1164-1165,1188-1189,1213-1214,1238-1240
+backend/tests/test_message_processing.py
+  s_d47a7edc42b01d::t_bf32b0cb119720 1-131
+backend/tests/test_mindie_provider.py
+  s_d47a7edc42b01d::t_6e762780bbff91 154-170
+backend/tests/test_multi_worker_postgres_gate.py
+  s_d47a7edc42b01d::t_2decb15ba40af4 22,27,29-30,57-75
+backend/tests/test_nginx_langgraph_body_size.py
+  s_d47a7edc42b01d::t_780c3b94d647b3 1-130
+backend/tests/test_persistence_engine_postgres_config.py
+  s_d47a7edc42b01d::t_0da00560cc4920 1-225
+backend/tests/test_persistence_scaffold.py
+  s_d47a7edc42b01d::t_f9708c1dc1cec4 52-60
+backend/tests/test_prompt_external.py
+  s_d47a7edc42b01d::t_10b76033ee2734 1-137
+backend/tests/test_rbac_authorization_provider.py
+  s_d47a7edc42b01d::t_ed6ace6c502e01 1-416
+backend/tests/test_runs_api_endpoints.py
+  s_d47a7edc42b01d::t_0e8684ae5e0417 7,212-225,307-344
+backend/tests/test_runtime_paths.py
+  s_d47a7edc42b01d::t_7d56480af40025 182-279
+backend/tests/test_sandbox_orphan_reconciliation.py
+  s_d47a7edc42b01d::t_d1087b5f84da8e 17,21-22,334-408,412-413,418-421,423-424,434-438,442-443,449-456,460-462,480-482,501-503,527,529,549,551,560,562,571-1966,2042-2842
+backend/tests/test_sandbox_ownership_store.py
+  s_d47a7edc42b01d::t_d4f786fe227c58 1-512
+backend/tests/test_security_scanner.py
+  s_d47a7edc42b01d::t_f7268b48bcbea0 1,20-24,26,148-227
+backend/tests/test_serper_tools.py
+  s_d47a7edc42b01d::t_56aa770aba18aa 272-276
+backend/tests/test_skill_manage_tool.py
+  s_d47a7edc42b01d::t_d9aee34d5e35af 343-382
+backend/tests/test_skill_policy_deferred_discovery.py
+  s_d47a7edc42b01d::t_148b95c2b23333 44,47,99-157
+backend/tests/test_skills_installer.py
+  s_d47a7edc42b01d::t_bd6f60a749f4d8 38-45,150-164,179-197,272-351,579-614
+backend/tests/test_skills_reload.py
+  s_d47a7edc42b01d::t_3284bcada8e492 1-267
+backend/tests/test_skills_router_authz.py
+  s_d47a7edc42b01d::t_ec1074b1cc9536 22,60,145-156,167-169
+backend/tests/test_skillscan_native.py
+  s_d47a7edc42b01d::t_2606a6adbde09d 4,13,109-160,201-306,337-355,684-1270
+backend/tests/test_subagent_executor.py
+  s_d47a7edc42b01d::t_0fb5eb604c9b54 3136-3253
+backend/tests/test_support_bundle.py
+  s_d47a7edc42b01d::t_8b3c89fdc6030c 193-336
+backend/tests/test_task_tool_core_logic.py
+  s_d47a7edc42b01d::t_bdc2d4d0c7ecbf 303-414
+backend/tests/test_thread_run_query_validation.py
+  s_d47a7edc42b01d::t_f3d75a729b02a3 1-87
+backend/tests/test_threads_router.py
+  s_d47a7edc42b01d::t_6b791e3d20e45b 4,161-183
+backend/tests/test_tool_error_handling_middleware.py
+  s_d47a7edc42b01d::t_b610b28037816d 6,19,26-29,569-586
+backend/tests/test_trace_context.py
+  s_d47a7edc42b01d::t_88395ba1d23052 12-20,95-121
+backend/tests/test_trace_middleware.py
+  s_d47a7edc42b01d::t_68747824e381c7 8-12,23-26,87-96
+backend/tests/test_tui_app.py
+  s_d47a7edc42b01d::t_513992d250dabc 8,15,19-21,29,97,102-119,148-275
+backend/tests/test_tui_command_registry.py
+  s_d47a7edc42b01d::t_4fd5482f6e0d8d 105-112
+backend/tests/test_tui_view_state.py
+  s_d47a7edc42b01d::t_0d14cd069b17e7 14,196-209
+backend/tests/test_uploads_router.py
+  s_d47a7edc42b01d::t_2740fb3b5e13b0 195-196,234-235,818-1025
+backend/tests/test_web_fetch_error_shell_meta.py
+  s_d47a7edc42b01d::t_7f04451d4f9f0a 1-365
+backend/tests/test_wechat_channel.py
+  s_d47a7edc42b01d::t_df364ea0768583 87-113,1264-1396
+backend/tests/test_worker_langfuse_metadata.py
+  s_d47a7edc42b01d::t_1258961297f102 17-22,295-344
+backend/tests/test_workspace_changes.py
+  s_d47a7edc42b01d::t_d61d2b241b8f37 185-211,228-241,290-368,477
+backend/uv.lock
+  s_d47a7edc42b01d::t_99d233120692ae 799-801,832,853,914-916,975,988,3231-3249
+config.example.yaml
+  s_d47a7edc42b01d::t_e126e2590b610b 18,33-49,651,805-863,1265-1312,1492-1495,1689-1699,1716,1790-1794,2001,2003-2004,2006,2118-2160,2179-2192,2194-2196
+deploy/helm/deer-flow/README.md
+  s_d47a7edc42b01d::t_5322a021637c12 127,140-141
+deploy/helm/deer-flow/templates/configmap-nginx.yaml
+  s_d47a7edc42b01d::t_a1d702de7df736 77-81
+deploy/helm/deer-flow/values.yaml
+  s_d47a7edc42b01d::t_d7240d460568b0 243,268-269
+docker/nginx/nginx.conf
+  s_d47a7edc42b01d::t_f05c507402d4f8 33-41,80-90,171-190,285
+docker/nginx/nginx.local.conf
+  s_d47a7edc42b01d::t_42ad8ccc029bef 30-38,69-79,174-195,296
+docs/plans/2026-07-10-pluggable-authorization-implementation-notes.md
+  s_d47a7edc42b01d::t_4e3289f7c040ea 1-271
+docs/plans/2026-07-10-pluggable-authorization-rfc.md
+  s_d47a7edc42b01d::t_76b1fb5b64583c 4-8
+docs/plans/2026-07-15-authz-phase1a-implementation-plan.md
+  s_d47a7edc42b01d::t_0de9e5013a7a0c 1-398
+docs/plans/2026-07-15-authz-phase1a1-trusted-principal-implementation-plan.md
+  s_d47a7edc42b01d::t_d0727e9c731cdd 1-514
+docs/plans/2026-07-17-remember-login.md
+  s_d47a7edc42b01d::t_6cc1e57ed863b7 1-102
+extensions_config.example.json
+  s_d47a7edc42b01d::t_295139c85ef42a 2
+frontend/AGENTS.md
+  s_d47a7edc42b01d::t_1bf7c63bba479c 75-78,89,98,101
+frontend/src/app/(auth)/login/page.tsx
+  s_d47a7edc42b01d::t_426324a70f03ff 8,13-16,67,108-115,176-181,206-207,281-285,324
+frontend/src/app/(auth)/setup/page.tsx
+  s_d47a7edc42b01d::t_8953dc9a39ce6d 7,13,34-36,90,140,231-234,297-300
+frontend/src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx
+  s_d47a7edc42b01d::t_36258783157fd0 366-367
+frontend/src/app/workspace/agents/new/page.tsx
+  s_d47a7edc42b01d::t_06c2272f3ae5ed 48,134,138
+frontend/src/app/workspace/chats/[thread_id]/page.tsx
+  s_d47a7edc42b01d::t_5f877cba53ee27 10,37,73,246,267,297,386
+frontend/src/app/workspace/chats/[thread_id]/providers.tsx
+  s_d47a7edc42b01d::t_9d39da51982bdd 5,12-14
+frontend/src/components/auth/remember-session-option.tsx
+  s_d47a7edc42b01d::t_2f7cae2a53371b 1-32
+frontend/src/components/workspace/artifacts/artifact-file-detail.tsx
+  s_d47a7edc42b01d::t_86053c9321392a 132-138,369,538-542
+frontend/src/components/workspace/browser-view/api.ts
+  s_d47a7edc42b01d::t_c449d3ba4098af 1-55
+frontend/src/components/workspace/browser-view/browser-trigger.tsx
+  s_d47a7edc42b01d::t_efd4f9e6a31394 1-44
+frontend/src/components/workspace/browser-view/browser-view-panel.tsx
+  s_d47a7edc42b01d::t_c0a76a3fd73eb3 1-462
+frontend/src/components/workspace/browser-view/context.tsx
+  s_d47a7edc42b01d::t_d3a09834f88a1b 1-76
+frontend/src/components/workspace/browser-view/index.ts
+  s_d47a7edc42b01d::t_9f7798e99fabc5 1-19
+frontend/src/components/workspace/browser-view/keyboard.ts
+  s_d47a7edc42b01d::t_2d94eb3d0e2459 1-55
+frontend/src/components/workspace/browser-view/use-browser-stream.ts
+  s_d47a7edc42b01d::t_97f9e2ad180012 1-237
+frontend/src/components/workspace/changes/workspace-change-panel.tsx
+  s_d47a7edc42b01d::t_2348f51d09f373 228-230
+frontend/src/components/workspace/chats/chat-box.tsx
+  s_d47a7edc42b01d::t_36bc2f659b370d 7-11,28,34,36-40,57-58,116-120,150-155,157-159,231-233,245-249,266-272,275-279,281-338
+frontend/src/components/workspace/citations/artifact-link.tsx
+  s_d47a7edc42b01d::t_bb4e3e57dc4187 5-6,15-35
+frontend/src/components/workspace/input-box-helpers.ts
+  s_d47a7edc42b01d::t_76f6cf1f0ef043 9-54
+frontend/src/components/workspace/input-box.tsx
+  s_d47a7edc42b01d::t_a42044cb6766ba 26,30,72,87-95,143,150-151,163-164,293-294,321-322,346,349,353,381-387,405,584-660,686,689,692-776,1071-1090,1092-1094,1119-1120,1151-1163,1203,1263-1266,1774-1796,1805-1811,1813-1819,2590-2607
+frontend/src/components/workspace/messages/markdown-content.tsx
+  s_d47a7edc42b01d::t_7cf7853cc42dc4 9-10,12-13,40-43,46-158,225-231,233-234,246,254,256,264
+frontend/src/components/workspace/messages/markdown-link.tsx
+  s_d47a7edc42b01d::t_b822383570d4da 3,8-51,53-56,69-93,109
+frontend/src/components/workspace/messages/message-group.tsx
+  s_d47a7edc42b01d::t_d031d614eaa77b 12,18,29,44,50,54,57-68,230,233,405-445,500-528,537,539-540,549,551-552,557,568-615,870,879-903,949
+frontend/src/components/workspace/messages/message-list-item.tsx
+  s_d47a7edc42b01d::t_097700f5e0db82 211-220,227-234,571-572
+frontend/src/components/workspace/messages/message-list.tsx
+  s_d47a7edc42b01d::t_61cf5132443adb 40,57,74,94-188,364-367,404-441,461-501,872,893-902,1198-1200,1243-1247,1249
+frontend/src/components/workspace/recent-chat-list.tsx
+  s_d47a7edc42b01d::t_f5c019cabf71b6 84-93
+frontend/src/components/workspace/sidecar/sidecar-panel.tsx
+  s_d47a7edc42b01d::t_75d0c87d3a15c6 553,567-580
+frontend/src/core/agents/api.ts
+  s_d47a7edc42b01d::t_33c807a9817be2 3
+frontend/src/core/artifacts/utils.ts
+  s_d47a7edc42b01d::t_d3f741e3f0a828 7-33,48-49,51,53,66-71,80,83,85,97,103,115-116
+frontend/src/core/auth/remember-login.ts
+  s_d47a7edc42b01d::t_6e21f97fd15e5c 1-47
+frontend/src/core/auth/setup.ts
+  s_d47a7edc42b01d::t_3713364762c8cd 5,34-40
+frontend/src/core/features/api.ts
+  s_d47a7edc42b01d::t_e06cb04e1e971a 1-23
+frontend/src/core/features/hooks.ts
+  s_d47a7edc42b01d::t_a284b823d54df0 1-18
+frontend/src/core/features/index.ts
+  s_d47a7edc42b01d::t_f51c7b0794e41e 1-2
+frontend/src/core/i18n/locales/en-US.ts
+  s_d47a7edc42b01d::t_06022a570bf41e 56-57,125,205-206,587-595,858-860
+frontend/src/core/i18n/locales/types.ts
+  s_d47a7edc42b01d::t_e8ca848d02e261 45-46,107,171-172,476-484,731-732
+frontend/src/core/i18n/locales/zh-CN.ts
+  s_d47a7edc42b01d::t_c5bf73639c71d5 56-57,123,192-193,564-572,826-828
+frontend/src/core/settings/local.ts
+  s_d47a7edc42b01d::t_730c4e7692b777 26-64,114-116,128,131,154,168
+frontend/src/core/threads/composer-draft.ts
+  s_d47a7edc42b01d::t_50b7ce76963b7d 1-130
+frontend/src/core/threads/utils.ts
+  s_d47a7edc42b01d::t_5c347e51d8b3cf 24,39-40
+frontend/src/core/uploads/api.ts
+  s_d47a7edc42b01d::t_980b2d31ed75ca 119,121
+frontend/src/core/workspace-changes/summary.ts
+  s_d47a7edc42b01d::t_fa37350bfd5e69 11-16,46-51,55
+frontend/src/core/workspace-changes/types.ts
+  s_d47a7edc42b01d::t_0bc8a427197051 1-5,11-12,18,39-41
+frontend/src/styles/globals.css
+  s_d47a7edc42b01d::t_074ec5908ffbf8 88-97
+frontend/tests/e2e/agent-chat.spec.ts
+  s_d47a7edc42b01d::t_e61f563f0b5349 15-19,44-62
+frontend/tests/e2e/artifact-preview.spec.ts
+  s_d47a7edc42b01d::t_db1e3141a0cea1 9,16,114-116,328-367
+frontend/tests/e2e/browser-feature.spec.ts
+  s_d47a7edc42b01d::t_8a9c0935f94c07 1-39
+frontend/tests/e2e/chat.spec.ts
+  s_d47a7edc42b01d::t_0694ba02918627 5-23,47-244
+frontend/tests/e2e/utils/mock-api.ts
+  s_d47a7edc42b01d::t_cac3fffb4e8202 90-93,133-142,261-264,983-986,1040,1048-1051
+frontend/tests/e2e/workspace-changes.spec.ts
+  s_d47a7edc42b01d::t_9eb3927d47705f 52
+frontend/tests/unit/components/auth/remember-session-option.test.ts
+  s_d47a7edc42b01d::t_674416f93ffa3d 1-32
+frontend/tests/unit/components/workspace/browser-view/keyboard.test.ts
+  s_d47a7edc42b01d::t_f17482149d9d2c 1-71
+frontend/tests/unit/components/workspace/citations/artifact-link.test.ts
+  s_d47a7edc42b01d::t_1e26a0258066ec 1-41
+frontend/tests/unit/components/workspace/input-box-helpers.test.ts
+  s_d47a7edc42b01d::t_e415dfe541dacf 10,14,17-18,71-162
+frontend/tests/unit/components/workspace/messages/markdown-content.test.ts
+  s_d47a7edc42b01d::t_7ae330780c1a7b 85-91
+frontend/tests/unit/components/workspace/messages/markdown-link.test.ts
+  s_d47a7edc42b01d::t_cee02034c99781 1-91
+frontend/tests/unit/components/workspace/messages/message-group.test.ts
+  s_d47a7edc42b01d::t_323075c18d96ef 3,124-166,169-172,182
+frontend/tests/unit/core/agents/features.test.ts
+  s_d47a7edc42b01d::t_27d6a913c80d5a 13,49-81
+frontend/tests/unit/core/artifacts/utils.test.ts
+  s_d47a7edc42b01d::t_241b34e1f48f4c 77-149,169,196-200
+frontend/tests/unit/core/auth/remember-login.test.ts
+  s_d47a7edc42b01d::t_dd37f4245f7bed 1-93
+frontend/tests/unit/core/auth/setup.test.ts
+  s_d47a7edc42b01d::t_c6889dd4428149 59-80
+frontend/tests/unit/core/settings/local.test.ts
+  s_d47a7edc42b01d::t_4d55937a108e7e 1,3-13,21-33
+frontend/tests/unit/core/threads/composer-draft.test.ts
+  s_d47a7edc42b01d::t_70130a4ab9265a 1-172
+frontend/tests/unit/core/threads/utils.test.ts
+  s_d47a7edc42b01d::t_118ee8d4f9d12a 19-30
+frontend/tests/unit/core/uploads/api.test.ts
+  s_d47a7edc42b01d::t_f03255412930a7 1-49
+frontend/tests/unit/core/workspace-changes/summary.test.ts
+  s_d47a7edc42b01d::t_46c3303e6df9ab 7,9-36,45,59-77,97-127
+scripts/detect_uv_extras.py
+  s_d47a7edc42b01d::t_9e9211b968b72c 14-15,18,80,227-250,264-265,268-269,276-277
+scripts/support_bundle.py
+  s_d47a7edc42b01d::t_bee24df1633129 24-26,29-52,133-134,136,138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "a3767c877f440e2323e0abed83ab17cc06c04c01",
+  "prompts": {},
+  "sessions": {
+    "s_d47a7edc42b01d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8498-fd91-71c2-9e69-360eb4535a32",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
