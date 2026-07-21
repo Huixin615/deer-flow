@@ -1,0 +1,23 @@
+backend/app/gateway/checkpoint_lineage.py
+  s_292604db4e718b::t_42b8cd52544e26 1-129
+backend/tests/test_threads_router.py
+  s_292604db4e718b::t_5367d1692d2e1e 11,15,79,94,830-909,921-956,961-963,992,1036-1038,1043-1045,1073-1075,1084-1086,1126-1145,1154-1156,1165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "b9c46508ee00702cc5f6be16029698fccf226ec8",
+  "prompts": {},
+  "sessions": {
+    "s_292604db4e718b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8553-f9d8-7741-9bc0-a541fc4c4585",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
