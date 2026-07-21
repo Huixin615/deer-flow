@@ -12,7 +12,6 @@ matching the LangGraph Platform wire format expected by the
 
 from __future__ import annotations
 
-import copy
 import logging
 import shutil
 import uuid
@@ -25,6 +24,12 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 
 from app.gateway.authz import require_permission
+from app.gateway.checkpoint_lineage import (
+    CheckpointLineageError,
+    copy_checkpoint_to_thread,
+    find_checkpoint_before_message,
+    is_duration_only_checkpoint,
+)
 from app.gateway.deps import get_checkpointer, get_run_manager
 from app.gateway.internal_auth import get_trusted_internal_owner_user_id
 from app.gateway.utils import sanitize_log_param
@@ -64,6 +69,7 @@ _SERVER_RESERVED_METADATA_KEYS: frozenset[str] = frozenset({"owner_id", "user_id
 _SIDECAR_METADATA_KEY = "deerflow_sidecar"
 _BRANCH_METADATA_KEY = "deerflow_branch"
 _BRANCH_HISTORY_SCAN_LIMIT = 200
+_BRANCH_HISTORY_RAW_SCAN_LIMIT = _BRANCH_HISTORY_SCAN_LIMIT * 2
 
 
 def _strip_reserved_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
@@ -134,10 +140,23 @@ def _matches_branch_target(messages: list[Any], target_message_ids: set[str]) ->
     return not any(_is_branch_visible_message(message) for message in messages[target_end_index + 1 :])
 
 
+def _branch_target_human_message(messages: list[Any], target_message_ids: set[str]) -> Any | None:
+    index_by_id = {_message_id(message): index for index, message in enumerate(messages) if _message_id(message)}
+    if not target_message_ids.issubset(index_by_id.keys()):
+        return None
+    target_start_index = min(index_by_id[message_id] for message_id in target_message_ids)
+    return next(
+        (message for message in reversed(messages[:target_start_index]) if _message_type(message) == "human" and _is_branch_visible_message(message)),
+        None,
+    )
+
+
 async def _find_branch_checkpoint(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> Any:
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
-        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT):
+            if is_duration_only_checkpoint(checkpoint_tuple):
+                continue
             if _matches_branch_target(_checkpoint_messages(checkpoint_tuple), target_message_ids):
                 return checkpoint_tuple
     except Exception:
@@ -159,7 +178,7 @@ async def _branch_targets_latest_turn(checkpointer: Any, thread_id: str, target_
     """
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
-        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT):
             messages = _checkpoint_messages(checkpoint_tuple)
             if not messages:
                 continue
@@ -648,6 +667,25 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
     parent_checkpoint_id = _checkpoint_id(checkpoint_tuple)
     if not parent_checkpoint_id:
         raise HTTPException(status_code=409, detail="This turn can no longer be branched from.")
+    target_human = _branch_target_human_message(_checkpoint_messages(checkpoint_tuple), target_message_ids)
+    target_human_id = _message_id(target_human)
+    if not target_human_id:
+        raise HTTPException(status_code=409, detail="This turn can no longer be branched from.")
+    try:
+        replay_base_tuple = await find_checkpoint_before_message(
+            checkpointer,
+            checkpoint_tuple,
+            target_human_id,
+            max_depth=_BRANCH_HISTORY_RAW_SCAN_LIMIT,
+        )
+    except CheckpointLineageError:
+        logger.warning(
+            "Could not resolve replay base for branch from thread %s checkpoint %s",
+            sanitize_log_param(thread_id),
+            sanitize_log_param(parent_checkpoint_id),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=409, detail="This turn can no longer be branched from.") from None
 
     # Workspace files are not checkpointed, so they only reflect the *current* thread
     # state. Cloning them onto a branch from an older turn would leak files created
@@ -673,22 +711,27 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
     thread_owner_user_id = get_trusted_internal_owner_user_id(request)
     thread_owner_kwargs = {"user_id": thread_owner_user_id} if thread_owner_user_id else {}
 
-    checkpoint = copy.deepcopy(getattr(checkpoint_tuple, "checkpoint", {}) or {})
-    metadata = copy.deepcopy(getattr(checkpoint_tuple, "metadata", {}) or {})
-    checkpoint["id"] = str(uuid6())
-    metadata.update(
-        {
-            "source": "branch",
-            "updated_at": now,
-            "created_at": now,
-            **branch_metadata,
-        }
-    )
-
-    write_config = {"configurable": {"thread_id": new_thread_id, "checkpoint_ns": ""}}
-    new_versions = dict(checkpoint.get("channel_versions", {}) or {})
+    checkpoint_metadata_updates = {
+        "source": "branch",
+        "updated_at": now,
+        "created_at": now,
+        **branch_metadata,
+    }
     try:
-        await checkpointer.aput(write_config, checkpoint, metadata, new_versions)
+        replay_base_config = await copy_checkpoint_to_thread(
+            checkpointer,
+            replay_base_tuple,
+            new_thread_id,
+            metadata_updates=checkpoint_metadata_updates,
+        )
+        await copy_checkpoint_to_thread(
+            checkpointer,
+            checkpoint_tuple,
+            new_thread_id,
+            metadata_updates=checkpoint_metadata_updates,
+            parent_config=replay_base_config,
+            checkpoint_id=str(uuid6()),
+        )
     except Exception:
         logger.exception("Failed to write branch checkpoint for thread %s", sanitize_log_param(new_thread_id))
         raise HTTPException(status_code=500, detail="Failed to create branch") from None

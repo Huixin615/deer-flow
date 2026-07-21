@@ -8,11 +8,11 @@ from _router_auth_helpers import make_authed_test_app
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langgraph.checkpoint.base import empty_checkpoint
+from langgraph.checkpoint.base import empty_checkpoint, uuid6
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from app.gateway.routers import threads
+from app.gateway.routers import thread_runs, threads
 from deerflow.config.paths import Paths
 from deerflow.persistence.thread_meta import InvalidMetadataFilterError
 from deerflow.persistence.thread_meta.memory import THREADS_NS, MemoryThreadMetaStore
@@ -76,6 +76,7 @@ async def _write_checkpoint(
     *,
     step: int,
     metadata: dict | None = None,
+    parent_config: dict | None = None,
 ) -> dict:
     checkpoint = empty_checkpoint()
     checkpoint["id"] = checkpoint_id
@@ -90,7 +91,7 @@ async def _write_checkpoint(
     }
     checkpoint_metadata.update(metadata or {})
     return await checkpointer.aput(
-        {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
+        parent_config or {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
         checkpoint,
         checkpoint_metadata,
         {"messages": step},
@@ -826,6 +827,86 @@ def test_ai_message_lacks_duration_only_for_unannotated_ai_messages() -> None:
 # ── branch threads from completed assistant turns ─────────────────────────────
 
 
+def test_branch_thread_can_prepare_regenerate_without_branch_run_events() -> None:
+    app, _store, checkpointer = _build_thread_app()
+    app.include_router(thread_runs.router)
+    source_thread_id = "source-regenerate"
+    source_run_id = "source-run"
+
+    async def list_messages(_thread_id: str, *, limit: int, **_kwargs) -> list[dict]:
+        assert limit == thread_runs.REGENERATE_HISTORY_SCAN_LIMIT
+        return []
+
+    async def list_by_thread(_thread_id: str, *, user_id=None, limit: int = 100) -> list:
+        return []
+
+    app.state.run_event_store = SimpleNamespace(list_messages=list_messages)
+    app.state.run_manager = SimpleNamespace(list_by_thread=list_by_thread)
+
+    human = HumanMessage(id="human-1", content="Question", additional_kwargs={"run_id": source_run_id})
+    ai = AIMessage(id="ai-1", content="Answer")
+
+    with TestClient(app) as client:
+        created = client.post("/api/threads", json={"thread_id": source_thread_id, "metadata": {}})
+        assert created.status_code == 200, created.text
+
+        initial = asyncio.run(checkpointer.aget_tuple({"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}}))
+        assert initial is not None
+        initial_checkpoint_id = initial.config["configurable"]["checkpoint_id"]
+        after_human = asyncio.run(
+            _write_checkpoint(
+                checkpointer,
+                source_thread_id,
+                str(uuid6()),
+                [human],
+                step=1,
+                parent_config=initial.config,
+            )
+        )
+        asyncio.run(
+            _write_checkpoint(
+                checkpointer,
+                source_thread_id,
+                str(uuid6()),
+                [human, ai],
+                step=2,
+                parent_config=after_human,
+            )
+        )
+
+        branch_response = client.post(
+            f"/api/threads/{source_thread_id}/branches",
+            json={"message_id": "ai-1", "message_ids": ["ai-1"]},
+        )
+        assert branch_response.status_code == 200, branch_response.text
+        branch_thread_id = branch_response.json()["thread_id"]
+
+        prepare_response = client.post(
+            f"/api/threads/{branch_thread_id}/runs/regenerate/prepare",
+            json={"message_id": "ai-1"},
+        )
+
+    assert prepare_response.status_code == 200, prepare_response.text
+    prepared = prepare_response.json()
+    assert prepared["target_run_id"] == source_run_id
+    assert prepared["checkpoint"]["checkpoint_id"] == initial_checkpoint_id
+    assert prepared["input"]["messages"][0]["id"] == "human-1"
+    assert prepared["input"]["messages"][0]["content"] == [{"type": "text", "text": "Question"}]
+
+    branch_base = asyncio.run(
+        checkpointer.aget_tuple(
+            {
+                "configurable": {
+                    "thread_id": branch_thread_id,
+                    "checkpoint_ns": "",
+                    "checkpoint_id": initial_checkpoint_id,
+                }
+            }
+        )
+    )
+    assert branch_base is not None
+
+
 def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> None:
     app, store, checkpointer = _build_thread_app()
     source_thread_id = "source-thread"
@@ -837,16 +918,49 @@ def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> N
     human_3 = HumanMessage(id="human-3", content="Third question")
     ai_3 = AIMessage(id="ai-3", content="Third answer")
 
-    async def _seed() -> None:
-        await _write_checkpoint(checkpointer, source_thread_id, "0001", [human_1, ai_1], step=1)
-        await _write_checkpoint(checkpointer, source_thread_id, "0002", [human_1, ai_1, human_2, ai_2], step=2)
-        await _write_checkpoint(checkpointer, source_thread_id, "0003", [human_1, ai_1, human_2, ai_2, human_3, ai_3], step=3)
-
-    asyncio.run(_seed())
+    async def _seed(parent_config: dict) -> dict:
+        after_human_1 = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human_1], step=1, parent_config=parent_config)
+        after_ai_1 = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human_1, ai_1], step=2, parent_config=after_human_1)
+        after_human_2 = await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2],
+            step=3,
+            parent_config=after_ai_1,
+        )
+        after_ai_2 = await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2, ai_2],
+            step=4,
+            parent_config=after_human_2,
+        )
+        after_human_3 = await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2, ai_2, human_3],
+            step=5,
+            parent_config=after_ai_2,
+        )
+        await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2, ai_2, human_3, ai_3],
+            step=6,
+            parent_config=after_human_3,
+        )
+        return after_ai_2
 
     with TestClient(app) as client:
         created = client.post("/api/threads", json={"thread_id": source_thread_id, "metadata": {}, "assistant_id": "agent"})
         assert created.status_code == 200, created.text
+        initial = asyncio.run(checkpointer.aget_tuple({"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}}))
+        assert initial is not None
+        target_checkpoint_config = asyncio.run(_seed(initial.config))
         asyncio.run(
             store.aput(
                 THREADS_NS,
@@ -875,7 +989,7 @@ def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> N
         search_response = client.post("/api/threads/search", json={"limit": 10})
 
     assert body["parent_thread_id"] == source_thread_id
-    assert body["parent_checkpoint_id"] == "0002"
+    assert body["parent_checkpoint_id"] == target_checkpoint_config["configurable"]["checkpoint_id"]
     assert body["branched_from_message_id"] == "ai-2"
     assert body["workspace_clone_mode"] == "skipped_historical_turn"
 
@@ -919,14 +1033,16 @@ def test_branch_thread_rejects_non_assistant_targets() -> None:
     human = HumanMessage(id="human-1", content="Question")
     ai = AIMessage(id="ai-1", content="Answer")
 
-    async def _seed() -> None:
-        await _write_checkpoint(checkpointer, source_thread_id, "0001", [human, ai], step=1)
-
-    asyncio.run(_seed())
+    async def _seed(parent_config: dict) -> None:
+        after_human = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human], step=1, parent_config=parent_config)
+        await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human, ai], step=2, parent_config=after_human)
 
     with TestClient(app) as client:
         created = client.post("/api/threads", json={"thread_id": source_thread_id, "metadata": {}})
         assert created.status_code == 200, created.text
+        initial = asyncio.run(checkpointer.aget_tuple({"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}}))
+        assert initial is not None
+        asyncio.run(_seed(initial.config))
 
         response = client.post(
             f"/api/threads/{source_thread_id}/branches",
@@ -954,10 +1070,9 @@ def test_branch_thread_best_effort_copies_current_workspace(tmp_path) -> None:
     human = HumanMessage(id="human-file", content="Make a file")
     ai = AIMessage(id="ai-file", content="Done")
 
-    async def _seed() -> None:
-        await _write_checkpoint(checkpointer, source_thread_id, "0001", [human, ai], step=1)
-
-    asyncio.run(_seed())
+    async def _seed(parent_config: dict) -> None:
+        after_human = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human], step=1, parent_config=parent_config)
+        await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human, ai], step=2, parent_config=after_human)
 
     with (
         patch("app.gateway.routers.threads.get_paths", return_value=paths),
@@ -966,6 +1081,9 @@ def test_branch_thread_best_effort_copies_current_workspace(tmp_path) -> None:
     ):
         created = client.post("/api/threads", json={"thread_id": source_thread_id, "metadata": {}})
         assert created.status_code == 200, created.text
+        initial = asyncio.run(checkpointer.aget_tuple({"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}}))
+        assert initial is not None
+        asyncio.run(_seed(initial.config))
 
         response = client.post(
             f"/api/threads/{source_thread_id}/branches",
@@ -1005,11 +1123,26 @@ def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> N
     human_2 = HumanMessage(id="human-2", content="Second question")
     ai_2 = AIMessage(id="ai-2", content="Second answer")
 
-    async def _seed() -> None:
-        await _write_checkpoint(checkpointer, source_thread_id, "0001", [human_1, ai_1], step=1)
-        await _write_checkpoint(checkpointer, source_thread_id, "0002", [human_1, ai_1, human_2, ai_2], step=2)
-
-    asyncio.run(_seed())
+    async def _seed(parent_config: dict) -> dict:
+        after_human_1 = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human_1], step=1, parent_config=parent_config)
+        after_ai_1 = await _write_checkpoint(checkpointer, source_thread_id, str(uuid6()), [human_1, ai_1], step=2, parent_config=after_human_1)
+        after_human_2 = await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2],
+            step=3,
+            parent_config=after_ai_1,
+        )
+        await _write_checkpoint(
+            checkpointer,
+            source_thread_id,
+            str(uuid6()),
+            [human_1, ai_1, human_2, ai_2],
+            step=4,
+            parent_config=after_human_2,
+        )
+        return after_ai_1
 
     with (
         patch("app.gateway.routers.threads.get_paths", return_value=paths),
@@ -1018,6 +1151,9 @@ def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> N
     ):
         created = client.post("/api/threads", json={"thread_id": source_thread_id, "metadata": {}})
         assert created.status_code == 200, created.text
+        initial = asyncio.run(checkpointer.aget_tuple({"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}}))
+        assert initial is not None
+        target_checkpoint_config = asyncio.run(_seed(initial.config))
 
         response = client.post(
             f"/api/threads/{source_thread_id}/branches",
@@ -1026,7 +1162,7 @@ def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> N
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["parent_checkpoint_id"] == "0001"
+    assert body["parent_checkpoint_id"] == target_checkpoint_config["configurable"]["checkpoint_id"]
     assert body["workspace_clone_mode"] == "skipped_historical_turn"
 
     target_user_data = paths.sandbox_user_data_dir(body["thread_id"], user_id=user_id)
