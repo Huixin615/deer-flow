@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   type MouseEvent,
+  type ReactNode,
 } from "react";
 import { toast } from "sonner";
 
@@ -23,10 +24,6 @@ import {
   ConversationContent,
   type ConversationProps,
 } from "@/components/ai-elements/conversation";
-import {
-  Reasoning,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
 import { Button } from "@/components/ui/button";
 import { extractArtifactsFromThread } from "@/core/artifacts/utils";
 import { useI18n } from "@/core/i18n/hooks";
@@ -37,6 +34,7 @@ import {
   type HumanInputRequest,
   type HumanInputResponse,
 } from "@/core/messages/human-input";
+import { getRunDurationDisplaysByGroupIndex } from "@/core/messages/run-duration";
 import {
   buildTokenDebugSteps,
   type TokenUsageInlineMode,
@@ -86,6 +84,7 @@ import {
   MessageTokenUsageDebugList,
   MessageTokenUsageList,
 } from "./message-token-usage";
+import { RunActivity, RunDuration } from "./run-duration";
 import { MessageListSkeleton } from "./skeleton";
 import { SubtaskCard } from "./subtask-card";
 
@@ -263,17 +262,44 @@ export function MessageList({
   const sidecar = useMaybeSidecar();
   const [selectionToolbar, setSelectionToolbar] =
     useState<SelectionToolbarState | null>(null);
-  const [turnStartTime, setTurnStartTime] = useState<number | null>(null);
+  const messages = thread.messages;
+  const groupedMessages = useMemo(() => getMessageGroups(messages), [messages]);
+  const [turnStartTime, setTurnStartTime] = useState<number | null>(() =>
+    thread.isLoading ? Date.now() : null,
+  );
+  const turnStartTimeRef = useRef(turnStartTime);
+  const [clientDurationsByGroupId, setClientDurationsByGroupId] = useState<
+    ReadonlyMap<string, number>
+  >(() => new Map());
   const prevIsLoading = useRef(thread.isLoading);
 
   useEffect(() => {
     if (thread.isLoading && !prevIsLoading.current) {
-      setTurnStartTime(Date.now());
+      const now = Date.now();
+      turnStartTimeRef.current = now;
+      setTurnStartTime(now);
+    } else if (!thread.isLoading && prevIsLoading.current) {
+      const startTime = turnStartTimeRef.current;
+      const lastAssistantGroup = [...groupedMessages]
+        .reverse()
+        .find((group) => group.type !== "human" && group.id);
+      if (startTime !== null && lastAssistantGroup?.id && !thread.error) {
+        const duration = Math.max(
+          0,
+          Math.floor((Date.now() - startTime) / 1000),
+        );
+        const key = `${threadId}:${lastAssistantGroup.id}`;
+        setClientDurationsByGroupId((current) => {
+          const next = new Map(current);
+          next.set(key, duration);
+          return next;
+        });
+      }
+      turnStartTimeRef.current = null;
+      setTurnStartTime(null);
     }
     prevIsLoading.current = thread.isLoading;
-  }, [thread.isLoading]);
-  const messages = thread.messages;
-  const groupedMessages = getMessageGroups(messages);
+  }, [groupedMessages, thread.error, thread.isLoading, threadId]);
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<
     string | null
   >(null);
@@ -283,24 +309,15 @@ export function MessageList({
   const [branchingMessageId, setBranchingMessageId] = useState<string | null>(
     null,
   );
-  const hasActiveAssistantText = useMemo(() => {
-    let lastHumanIndex = -1;
-    for (let i = groupedMessages.length - 1; i >= 0; i--) {
-      if (groupedMessages[i]?.type === "human") {
-        lastHumanIndex = i;
-        break;
-      }
-    }
-    if (lastHumanIndex === -1) return false;
-    return groupedMessages
-      .slice(lastHumanIndex)
-      .some((g) => g.type === "assistant");
-  }, [groupedMessages]);
   const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
   const updateSubtask = useUpdateSubtask();
   const lastGroupIndex = groupedMessages.length - 1;
   const turnUsageMessagesByGroupIndex =
     getAssistantTurnUsageMessages(groupedMessages);
+  const runDurationDisplaysByGroupIndex = useMemo(
+    () => getRunDurationDisplaysByGroupIndex(groupedMessages),
+    [groupedMessages],
+  );
   const tokenDebugSteps = useMemo(
     () => buildTokenDebugSteps(messages, t),
     [messages, t],
@@ -703,6 +720,47 @@ export function MessageList({
   }
 
   const artifactPaths = extractArtifactsFromThread(thread);
+  const withRunDuration = (
+    group: (typeof groupedMessages)[number],
+    groupIndex: number,
+    content: ReactNode,
+  ) => {
+    const persistedDisplays = runDurationDisplaysByGroupIndex[groupIndex] ?? [];
+    const clientDuration =
+      !thread.error && group.id
+        ? clientDurationsByGroupId.get(`${threadId}:${group.id}`)
+        : undefined;
+    const displays =
+      persistedDisplays.length > 0
+        ? persistedDisplays
+        : clientDuration !== undefined
+          ? [
+              {
+                runId: `client:${group.id}`,
+                durationSeconds: clientDuration,
+              },
+            ]
+          : [];
+
+    if (!content && displays.length === 0) {
+      return null;
+    }
+
+    return (
+      <div
+        key={`duration-group:${group.id ?? groupIndex}`}
+        className="flex w-full flex-col gap-2"
+      >
+        {content}
+        {displays.map((display) => (
+          <RunDuration
+            key={display.runId}
+            durationSeconds={display.durationSeconds}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -724,7 +782,9 @@ export function MessageList({
               thread.isLoading && groupIndex === lastGroupIndex;
 
             if (group.type === "human" || group.type === "assistant") {
-              return (
+              return withRunDuration(
+                group,
+                groupIndex,
                 <div
                   key={group.id}
                   data-assistant-turn={
@@ -751,11 +811,6 @@ export function MessageList({
                             : undefined
                         }
                         showCopyButton={group.type !== "assistant"}
-                        turnStartTime={
-                          groupIndex === groupedMessages.length - 1
-                            ? turnStartTime
-                            : null
-                        }
                       />
                     );
 
@@ -797,7 +852,7 @@ export function MessageList({
                         branchableAssistantGroupIds.has(group.id),
                       group.id === latestAssistantGroupId,
                     )}
-                </div>
+                </div>,
               );
             } else if (group.type === "assistant:clarification") {
               const message = group.messages[0];
@@ -814,7 +869,9 @@ export function MessageList({
                 const pending = pendingHumanInputRequestIds.has(
                   humanInputRequest.request_id,
                 );
-                return (
+                return withRunDuration(
+                  group,
+                  groupIndex,
                   <div key={group.id} className="w-full">
                     <HumanInputCard
                       answeredResponse={answeredResponse}
@@ -842,12 +899,14 @@ export function MessageList({
                       messages: group.messages,
                       turnUsageMessages,
                     })}
-                  </div>
+                  </div>,
                 );
               }
 
               if (hasContent(message)) {
-                return (
+                return withRunDuration(
+                  group,
+                  groupIndex,
                   <div key={group.id} className="w-full">
                     <MarkdownContent
                       content={extractContentFromMessage(message)}
@@ -858,10 +917,10 @@ export function MessageList({
                       messages: group.messages,
                       turnUsageMessages,
                     })}
-                  </div>
+                  </div>,
                 );
               }
-              return null;
+              return withRunDuration(group, groupIndex, null);
             } else if (group.type === "assistant:present-files") {
               const files: string[] = [];
               for (const message of group.messages) {
@@ -870,7 +929,9 @@ export function MessageList({
                   files.push(...presentFiles);
                 }
               }
-              return (
+              return withRunDuration(
+                group,
+                groupIndex,
                 <div className="w-full" key={group.id}>
                   {group.messages[0] && hasContent(group.messages[0]) && (
                     <MarkdownContent
@@ -885,7 +946,7 @@ export function MessageList({
                     messages: group.messages,
                     turnUsageMessages,
                   })}
-                </div>
+                </div>,
               );
             } else if (group.type === "assistant:subagent") {
               const tasks = new Set<Subtask>();
@@ -975,7 +1036,9 @@ export function MessageList({
                   );
                 }
               }
-              return (
+              return withRunDuration(
+                group,
+                groupIndex,
                 <div
                   key={"subtask-group-" + group.id}
                   className="relative z-1 flex flex-col gap-2"
@@ -986,10 +1049,12 @@ export function MessageList({
                     turnUsageMessages,
                     debugMessageIds: subagentDebugMessageIds,
                   })}
-                </div>
+                </div>,
               );
             }
-            return (
+            return withRunDuration(
+              group,
+              groupIndex,
               <div key={"group-" + group.id} className="w-full">
                 <MessageGroup
                   messages={group.messages}
@@ -1008,14 +1073,12 @@ export function MessageList({
                   turnUsageMessages,
                   inlineDebug: false,
                 })}
-              </div>
+              </div>,
             );
           })}
-          {thread.isLoading && !hasActiveAssistantText && (
+          {thread.isLoading && (
             <div className="w-full">
-              <Reasoning isStreaming={true} startTimeProp={turnStartTime}>
-                <ReasoningTrigger hasContent={false} />
-              </Reasoning>
+              <RunActivity startTime={turnStartTime} />
             </div>
           )}
           <div style={{ height: `${paddingBottom}px` }} />

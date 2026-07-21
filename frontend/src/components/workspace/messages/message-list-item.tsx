@@ -10,7 +10,6 @@ import {
   useCallback,
   useMemo,
   useState,
-  useEffect,
   type ImgHTMLAttributes,
 } from "react";
 
@@ -140,7 +139,6 @@ export function MessageListItem({
   threadId,
   artifactPaths = [],
   showCopyButton = true,
-  turnStartTime,
 }: {
   className?: string;
   message: Message;
@@ -150,7 +148,6 @@ export function MessageListItem({
   feedback?: FeedbackData | null;
   runId?: string;
   showCopyButton?: boolean;
-  turnStartTime?: number | null;
 }) {
   const isHuman = message.type === "human";
   return (
@@ -165,7 +162,6 @@ export function MessageListItem({
         threadId={threadId}
         artifactPaths={artifactPaths}
         runId={runId}
-        turnStartTime={turnStartTime}
       />
       {!isLoading && showCopyButton && (
         <MessageToolbar
@@ -224,8 +220,6 @@ function MessageImage({
   );
 }
 
-const clientTurnDurations = new Map<string, number>();
-
 function HumanMessageText({ content }: { content: string }) {
   // `parseSlashSkillReference` is a pure regex gate (no data subscription), so
   // the overwhelmingly common plain-text human message never subscribes to the
@@ -269,7 +263,6 @@ function MessageContent_({
   threadId,
   artifactPaths,
   runId,
-  turnStartTime,
 }: {
   className?: string;
   message: Message;
@@ -277,53 +270,10 @@ function MessageContent_({
   threadId: string;
   artifactPaths: readonly string[];
   runId?: string;
-  turnStartTime?: number | null;
 }) {
+  const { t } = useI18n();
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const isHuman = message.type === "human";
-  const rawTurnDuration = message.additional_kwargs?.turn_duration as
-    | number
-    | undefined;
-
-  const [cachedDuration, setCachedDuration] = useState<number | undefined>(
-    () =>
-      message.id
-        ? clientTurnDurations.get(`${threadId}:${message.id}`)
-        : undefined,
-  );
-  const turnDuration = rawTurnDuration ?? cachedDuration;
-
-  useEffect(() => {
-    if (rawTurnDuration !== undefined && message.id) {
-      clientTurnDurations.set(`${threadId}:${message.id}`, rawTurnDuration);
-      setCachedDuration(rawTurnDuration);
-    }
-  }, [rawTurnDuration, message.id, threadId]);
-
-  const handleDurationChange = useCallback(
-    (d: number | undefined) => {
-      if (d !== undefined && message.id) {
-        clientTurnDurations.set(`${threadId}:${message.id}`, d);
-        setCachedDuration(d);
-      }
-    },
-    [message.id, threadId],
-  );
-
-  useEffect(() => {
-    return () => {
-      for (const key of clientTurnDurations.keys()) {
-        if (key.startsWith(`${threadId}:`)) {
-          clientTurnDurations.delete(key);
-        }
-      }
-    };
-  }, [threadId]);
-
-  const [wasLoading, setWasLoading] = useState(isLoading);
-  useEffect(() => {
-    if (isLoading) setWasLoading(true);
-  }, [isLoading]);
   const components = useMemo(
     () => ({
       img: (props: ImgHTMLAttributes<HTMLImageElement>) => (
@@ -400,13 +350,10 @@ function MessageContent_({
   if (!isHuman && reasoningContent && !rawContent) {
     return (
       <AIElementMessageContent className={className}>
-        <Reasoning
-          isStreaming={isLoading}
-          startTimeProp={turnStartTime}
-          duration={turnDuration}
-          onTurnDurationChange={handleDurationChange}
-        >
-          <ReasoningTrigger />
+        <Reasoning isStreaming={isLoading}>
+          <ReasoningTrigger
+            getThinkingMessage={() => t.runDuration.reasoning}
+          />
           <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
         </Reasoning>
       </AIElementMessageContent>
@@ -445,20 +392,14 @@ function MessageContent_({
   return (
     <AIElementMessageContent className={className}>
       {filesList}
-      {!isHuman &&
-        (!!reasoningContent || wasLoading || turnDuration !== undefined) && (
-          <Reasoning
-            isStreaming={isLoading}
-            startTimeProp={turnStartTime}
-            duration={turnDuration}
-            onTurnDurationChange={handleDurationChange}
-          >
-            <ReasoningTrigger hasContent={!!reasoningContent} />
-            {reasoningContent && (
-              <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
-            )}
-          </Reasoning>
-        )}
+      {reasoningContent && (
+        <Reasoning isStreaming={isLoading}>
+          <ReasoningTrigger
+            getThinkingMessage={() => t.runDuration.reasoning}
+          />
+          <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
+        </Reasoning>
+      )}
       <MarkdownContent
         content={contentToDisplay}
         isLoading={isLoading}

@@ -44,6 +44,18 @@ export interface Translations {
     showArtifacts: string;
   };
 
+  runDuration: {
+    reasoning: string;
+    working: string;
+    completedIn: (duration: string) => string;
+    description: string;
+    lessThanSecond: string;
+    hours: (value: number) => string;
+    minutes: (value: number) => string;
+    seconds: (value: number) => string;
+    separator: string;
+  };
+
   home: {
     docs: string;
     blog: string;
