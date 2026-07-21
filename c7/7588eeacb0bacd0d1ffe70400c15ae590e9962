@@ -1,0 +1,39 @@
+README.md
+  s_d47a7edc42b01d::t_8492c95b789e10 676-677
+frontend/AGENTS.md
+  s_d47a7edc42b01d::t_075d75090ebb0b 73-74
+frontend/src/components/workspace/messages/message-list-item.tsx
+  s_d47a7edc42b01d::t_a600c856fa7a6f 274,353-356,395-402
+frontend/src/components/workspace/messages/run-duration.tsx
+  s_d47a7edc42b01d::t_813b54b4bceec3 1-59
+frontend/src/core/i18n/locales/en-US.ts
+  s_d47a7edc42b01d::t_2f9d7efc53ae1a 58-70
+frontend/src/core/i18n/locales/types.ts
+  s_d47a7edc42b01d::t_07a4e145e22720 47-58
+frontend/src/core/i18n/locales/zh-CN.ts
+  s_d47a7edc42b01d::t_f86ff7b465b1f5 58-69
+frontend/src/core/messages/run-duration.ts
+  s_d47a7edc42b01d::t_16996fcc055cb7 1-104
+frontend/tests/e2e/thread-history.spec.ts
+  s_d47a7edc42b01d::t_3a4e1864f97a8c 97-142
+frontend/tests/unit/core/messages/run-duration.test.ts
+  s_d47a7edc42b01d::t_4de2441b863b8f 1-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "c77588eeacb0bacd0d1ffe70400c15ae590e9962",
+  "prompts": {},
+  "sessions": {
+    "s_d47a7edc42b01d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8498-fd91-71c2-9e69-360eb4535a32",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
