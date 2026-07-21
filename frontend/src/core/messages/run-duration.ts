@@ -17,7 +17,7 @@ export interface RunDurationFormatter {
 
 type MessageWithRunId = Message & { run_id?: unknown };
 
-function readRunId(message: Message): string | undefined {
+export function getMessageRunId(message: Message): string | undefined {
   const runId = (message as MessageWithRunId).run_id;
   return typeof runId === "string" && runId.length > 0 ? runId : undefined;
 }
@@ -44,7 +44,7 @@ export function getRunDurationDisplaysByGroupIndex(
 
   groups.forEach((group, groupIndex) => {
     for (const message of group.messages) {
-      const runId = readRunId(message);
+      const runId = getMessageRunId(message);
       if (!runId) {
         continue;
       }

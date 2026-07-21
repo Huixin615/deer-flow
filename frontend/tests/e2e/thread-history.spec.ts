@@ -136,7 +136,9 @@ test.describe("Thread history", () => {
 
     await expect(page.getByTestId("run-duration")).toHaveCount(1);
     await expect(page.getByText("Completed in 1m 54s")).toBeVisible();
-    await expect(page.getByText("Reasoning")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Reasoning", exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Thought for 114 seconds")).toHaveCount(0);
   });
 

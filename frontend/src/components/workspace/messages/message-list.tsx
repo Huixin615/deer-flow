@@ -34,7 +34,10 @@ import {
   type HumanInputRequest,
   type HumanInputResponse,
 } from "@/core/messages/human-input";
-import { getRunDurationDisplaysByGroupIndex } from "@/core/messages/run-duration";
+import {
+  getMessageRunId,
+  getRunDurationDisplaysByGroupIndex,
+} from "@/core/messages/run-duration";
 import {
   buildTokenDebugSteps,
   type TokenDebugStep,
@@ -120,6 +123,16 @@ function sameMessageIdentity(previous: Message, next: Message) {
   return previousKey !== null && previousKey === nextKey;
 }
 
+function sameRunDurationMetadata(previous: Message, next: Message) {
+  return (
+    getMessageRunId(previous) === getMessageRunId(next) &&
+    Object.is(
+      previous.additional_kwargs?.turn_duration,
+      next.additional_kwargs?.turn_duration,
+    )
+  );
+}
+
 function canReuseMessageGroup(
   previous: ThreadMessageGroup | undefined,
   next: ThreadMessageGroup,
@@ -135,7 +148,8 @@ function canReuseMessageGroup(
   return previous.messages.every(
     (message, index) =>
       next.messages[index] !== undefined &&
-      sameMessageIdentity(message, next.messages[index]),
+      sameMessageIdentity(message, next.messages[index]) &&
+      sameRunDurationMetadata(message, next.messages[index]),
   );
 }
 
