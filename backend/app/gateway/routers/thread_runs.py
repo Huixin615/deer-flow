@@ -34,7 +34,7 @@ from app.gateway.checkpoint_lineage import (
 )
 from app.gateway.deps import get_checkpointer, get_current_user, get_feedback_repo, get_run_event_store, get_run_manager, get_run_store, get_stream_bridge, get_thread_store
 from app.gateway.pagination import trim_run_message_page
-from app.gateway.services import sse_consumer, start_run, wait_for_run_completion
+from app.gateway.services import build_checkpoint_state_accessor, build_thread_checkpoint_state_accessor, sse_consumer, start_run, wait_for_run_completion
 from app.gateway.utils import sanitize_log_param
 from deerflow.runtime import CancelOutcome, RunRecord, RunStatus, serialize_channel_values_for_api
 from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY, get_original_user_content_text, message_to_text
@@ -304,8 +304,8 @@ def _is_middleware_message_row(row: dict[str, Any]) -> bool:
     return str((row.get("metadata") or {}).get("caller", "")).startswith("middleware:")
 
 
-def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
-    return checkpoint_messages(checkpoint_tuple)
+def _checkpoint_messages(snapshot: Any) -> list[Any]:
+    return checkpoint_messages(snapshot)
 
 
 def _checkpoint_configurable(checkpoint_tuple: Any) -> dict[str, Any]:
@@ -444,11 +444,11 @@ async def _find_base_checkpoint_before_human(
     *,
     head_checkpoint: Any | None = None,
 ) -> Any:
-    checkpointer = get_checkpointer(request)
+    accessor, base_config = await build_thread_checkpoint_state_accessor(request, thread_id=thread_id)
     if head_checkpoint is not None:
         try:
             return await find_checkpoint_before_message(
-                checkpointer,
+                accessor,
                 head_checkpoint,
                 human_message_id,
                 max_depth=REGENERATE_HISTORY_RAW_SCAN_LIMIT,
@@ -461,10 +461,8 @@ async def _find_base_checkpoint_before_human(
                 sanitize_log_param(thread_id),
                 exc_info=True,
             )
-
-    base_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
-        raw_checkpoints = [item async for item in checkpointer.alist(base_config, limit=REGENERATE_HISTORY_RAW_SCAN_LIMIT)]
+        raw_checkpoints = await accessor.ahistory(base_config, limit=REGENERATE_HISTORY_RAW_SCAN_LIMIT)
         checkpoints = [item for item in raw_checkpoints if not _is_duration_only_checkpoint(item)]
     except Exception as exc:
         logger.exception("Failed to list checkpoints for regenerate thread %s", thread_id)
@@ -518,25 +516,22 @@ async def _repair_legacy_branch_base(
     if not await _branch_parent_is_accessible(parent_thread_id, request):
         raise HTTPException(status_code=409, detail=_MISSING_BRANCH_SOURCE_DETAIL)
 
-    checkpointer = get_checkpointer(request)
-    source_config = {
-        "configurable": {
-            "thread_id": parent_thread_id,
-            "checkpoint_ns": "",
-            "checkpoint_id": parent_checkpoint_id,
-        }
-    }
+    source_accessor, source_config = await build_thread_checkpoint_state_accessor(
+        request,
+        thread_id=parent_thread_id,
+        checkpoint_id=parent_checkpoint_id,
+    )
     try:
-        source_head = await checkpointer.aget_tuple(source_config)
+        source_head = await source_accessor.aget(source_config)
     except Exception as exc:
         logger.warning("Failed to read source checkpoint for legacy branch %s", sanitize_log_param(thread_id), exc_info=True)
         raise HTTPException(status_code=409, detail=_MISSING_BRANCH_SOURCE_DETAIL) from exc
-    if source_head is None:
+    if _checkpoint_configurable(source_head).get("checkpoint_id") != parent_checkpoint_id:
         raise HTTPException(status_code=409, detail=_MISSING_BRANCH_SOURCE_DETAIL)
 
     try:
         source_base = await find_checkpoint_before_message(
-            checkpointer,
+            source_accessor,
             source_head,
             human_message_id,
             max_depth=REGENERATE_HISTORY_RAW_SCAN_LIMIT,
@@ -548,6 +543,7 @@ async def _repair_legacy_branch_base(
     source_base_id = checkpoint_configurable(source_base).get("checkpoint_id")
     if not isinstance(source_base_id, str) or not source_base_id:
         raise HTTPException(status_code=409, detail=_MISSING_BRANCH_SOURCE_DETAIL)
+    checkpointer = get_checkpointer(request)
     branch_base_config = {
         "configurable": {
             "thread_id": thread_id,
@@ -565,9 +561,12 @@ async def _repair_legacy_branch_base(
 
         branch_metadata = {key: value for key, value in metadata.items() if key == _BRANCH_METADATA_KEY or key.startswith("branch_")}
         branch_metadata["source"] = "branch"
+        source_base_tuple = await checkpointer.aget_tuple(source_base.config)
+        if source_base_tuple is None:
+            raise HTTPException(status_code=409, detail=_MISSING_BRANCH_SOURCE_DETAIL)
         written_config = await copy_checkpoint_to_thread(
             checkpointer,
-            source_base,
+            source_base_tuple,
             thread_id,
             metadata_updates=branch_metadata,
         )
@@ -607,14 +606,14 @@ async def _resolve_base_checkpoint_before_human(
 
 
 async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: Request) -> RegeneratePrepareResponse:
-    checkpointer = get_checkpointer(request)
-    latest_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    accessor, latest_config = await build_thread_checkpoint_state_accessor(request, thread_id=thread_id)
     try:
-        latest_checkpoint = await checkpointer.aget_tuple(latest_config)
+        latest_checkpoint = await accessor.aget(latest_config)
     except Exception as exc:
         logger.exception("Failed to read latest checkpoint for regenerate thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to read latest checkpoint") from exc
-    if latest_checkpoint is None:
+    latest_checkpoint_id = _checkpoint_configurable(latest_checkpoint).get("checkpoint_id")
+    if not latest_checkpoint_id:
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} has no checkpoint")
 
     messages = _checkpoint_messages(latest_checkpoint)
@@ -730,14 +729,16 @@ async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> 
         completed = await wait_for_run_completion(bridge, record, request, run_mgr)
 
     if completed:
-        checkpointer = get_checkpointer(request)
-        config = {"configurable": {"thread_id": thread_id}}
         try:
-            checkpoint_tuple = await checkpointer.aget_tuple(config)
-            if checkpoint_tuple is not None:
-                checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-                channel_values = checkpoint.get("channel_values", {})
-                return serialize_channel_values_for_api(channel_values)
+            accessor, config = build_checkpoint_state_accessor(
+                request,
+                thread_id=thread_id,
+                assistant_id=body.assistant_id,
+            )
+            snapshot = await accessor.aget(config)
+            snapshot_config = snapshot.config or {}
+            if snapshot_config.get("configurable", {}).get("checkpoint_id"):
+                return serialize_channel_values_for_api(snapshot.values)
         except Exception:
             logger.exception("Failed to fetch final state for run %s", record.run_id)
 

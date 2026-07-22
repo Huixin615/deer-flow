@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -62,9 +63,11 @@ async def _collect_checkpoints(checkpointer: InMemorySaver, config: dict) -> lis
 
 
 class FakeCheckpointer:
-    def __init__(self, history, *, latest=None):
+    def __init__(self, history, *, latest=None, materialized_history=None, materialized_latest=None):
         self.history = history
         self.latest = latest
+        self.materialized_history = materialized_history
+        self.materialized_latest = materialized_latest
         self.alist_limits = []
 
     async def aget_tuple(self, config):
@@ -77,6 +80,71 @@ class FakeCheckpointer:
         self.alist_limits.append(limit)
         for item in self.history[:limit]:
             yield item
+
+
+def _snapshot(checkpoint_id: str, messages: list[object], *, metadata: dict | None = None):
+    return SimpleNamespace(
+        values={"messages": messages},
+        config={
+            "configurable": {
+                "thread_id": "thread-1",
+                "checkpoint_ns": "",
+                "checkpoint_id": checkpoint_id,
+                "checkpoint_map": None,
+            }
+        },
+        metadata=metadata or {},
+    )
+
+
+class FakeAccessor:
+    def __init__(self, checkpointer: FakeCheckpointer):
+        self.checkpointer = checkpointer
+
+    @staticmethod
+    def _from_raw(checkpoint):
+        return SimpleNamespace(
+            values=dict(checkpoint.checkpoint.get("channel_values", {})),
+            config=checkpoint.config,
+            metadata=checkpoint.metadata,
+            parent_config=getattr(checkpoint, "parent_config", None),
+        )
+
+    async def aget(self, config):
+        materialized_latest = getattr(self.checkpointer, "materialized_latest", None)
+        if materialized_latest is not None and not config.get("configurable", {}).get("checkpoint_id"):
+            return materialized_latest
+        raw = await self.checkpointer.aget_tuple(config)
+        return self._from_raw(raw) if raw is not None else SimpleNamespace(values={}, config={}, metadata={})
+
+    async def ahistory(self, config, *, limit=None):
+        alist_limits = getattr(self.checkpointer, "alist_limits", None)
+        if alist_limits is not None:
+            alist_limits.append(limit)
+        history = getattr(self.checkpointer, "materialized_history", None)
+        if history is None:
+            if hasattr(self.checkpointer, "history"):
+                history = [self._from_raw(item) for item in self.checkpointer.history]
+            else:
+                history = [self._from_raw(item) async for item in self.checkpointer.alist(config, limit=limit)]
+        return history[:limit]
+
+
+@pytest.fixture(autouse=True)
+def _patch_checkpoint_accessor(monkeypatch):
+    from app.gateway.routers import thread_runs
+
+    def build_accessor(request, *, thread_id, assistant_id=None, checkpoint_id=None):
+        config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+        if checkpoint_id is not None:
+            config["configurable"]["checkpoint_id"] = checkpoint_id
+        return FakeAccessor(request.app.state.checkpointer), config
+
+    async def build_thread_accessor(request, *, thread_id, checkpoint_id=None):
+        return build_accessor(request, thread_id=thread_id, checkpoint_id=checkpoint_id)
+
+    monkeypatch.setattr(thread_runs, "build_checkpoint_state_accessor", build_accessor)
+    monkeypatch.setattr(thread_runs, "build_thread_checkpoint_state_accessor", build_thread_accessor)
 
 
 class FakeEventStore:
@@ -129,8 +197,174 @@ def _request(checkpointer, event_store, *, run_manager=None, thread_store=None, 
     )
 
 
+def test_run_wait_readers_return_materialized_final_values() -> None:
+    from app.gateway.routers import runs, thread_runs
+
+    snapshot = SimpleNamespace(
+        values={
+            "messages": [
+                HumanMessage(id="h1", content="question"),
+                AIMessage(id="a1", content="answer"),
+            ]
+        },
+        config={
+            "configurable": {
+                "thread_id": "thread-1",
+                "checkpoint_ns": "",
+                "checkpoint_id": "ckpt-2",
+            }
+        },
+        parent_config={"configurable": {"checkpoint_id": "ckpt-1"}},
+        metadata={"step": 2},
+        next=(),
+        tasks=(),
+        created_at=None,
+    )
+    accessor = SimpleNamespace(aget=AsyncMock(return_value=snapshot))
+    record = SimpleNamespace(
+        run_id="run-1",
+        thread_id="thread-1",
+        task=None,
+        status=RunStatus.success,
+        error=None,
+    )
+    request = SimpleNamespace()
+    body = thread_runs.RunCreateRequest(
+        assistant_id="lead-agent",
+        config={"configurable": {"thread_id": "thread-1"}},
+    )
+
+    async def _scenario() -> tuple[dict, dict]:
+        with (
+            patch.object(thread_runs, "get_stream_bridge", return_value=object()),
+            patch.object(thread_runs, "get_run_manager", return_value=object()),
+            patch.object(thread_runs, "start_run", AsyncMock(return_value=record)),
+            patch.object(
+                thread_runs,
+                "build_checkpoint_state_accessor",
+                create=True,
+                return_value=(accessor, snapshot.config),
+            ),
+            patch.object(runs, "get_stream_bridge", return_value=object()),
+            patch.object(runs, "get_run_manager", return_value=object()),
+            patch.object(runs, "start_run", AsyncMock(return_value=record)),
+            patch.object(
+                runs,
+                "build_checkpoint_state_accessor",
+                create=True,
+                return_value=(accessor, snapshot.config),
+            ),
+        ):
+            thread_result = await thread_runs.wait_run.__wrapped__("thread-1", body, request)
+            stateless_result = await runs.stateless_wait(body, request)
+        return thread_result, stateless_result
+
+    thread_result, stateless_result = asyncio.run(_scenario())
+
+    assert [message["id"] for message in thread_result["messages"]] == ["h1", "a1"]
+    assert [message["id"] for message in stateless_result["messages"]] == ["h1", "a1"]
+
+
+def test_run_wait_readers_preserve_terminal_error_without_checkpoint() -> None:
+    from app.gateway.routers import runs, thread_runs
+
+    snapshot = SimpleNamespace(
+        values={},
+        config={"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}},
+        parent_config=None,
+        metadata={},
+        next=(),
+        tasks=(),
+        created_at=None,
+    )
+    accessor = SimpleNamespace(aget=AsyncMock(return_value=snapshot))
+    record = SimpleNamespace(
+        run_id="run-1",
+        thread_id="thread-1",
+        task=None,
+        status=RunStatus.error,
+        error="run failed before checkpoint",
+    )
+    request = SimpleNamespace()
+    body = thread_runs.RunCreateRequest(config={"configurable": {"thread_id": "thread-1"}})
+
+    async def _scenario() -> tuple[dict, dict]:
+        with (
+            patch.object(thread_runs, "get_stream_bridge", return_value=object()),
+            patch.object(thread_runs, "get_run_manager", return_value=object()),
+            patch.object(thread_runs, "start_run", AsyncMock(return_value=record)),
+            patch.object(
+                thread_runs,
+                "build_checkpoint_state_accessor",
+                return_value=(accessor, snapshot.config),
+            ),
+            patch.object(runs, "get_stream_bridge", return_value=object()),
+            patch.object(runs, "get_run_manager", return_value=object()),
+            patch.object(runs, "start_run", AsyncMock(return_value=record)),
+            patch.object(
+                runs,
+                "build_checkpoint_state_accessor",
+                return_value=(accessor, snapshot.config),
+            ),
+        ):
+            thread_result = await thread_runs.wait_run.__wrapped__("thread-1", body, request)
+            stateless_result = await runs.stateless_wait(body, request)
+        return thread_result, stateless_result
+
+    thread_result, stateless_result = asyncio.run(_scenario())
+
+    expected = {"status": "error", "error": "run failed before checkpoint"}
+    assert thread_result == expected
+    assert stateless_result == expected
+
+
+@pytest.mark.parametrize("route_name", ["thread", "stateless"])
+def test_run_wait_readers_preserve_terminal_error_when_accessor_builder_fails(route_name: str) -> None:
+    from app.gateway.routers import runs, thread_runs
+
+    record = SimpleNamespace(
+        run_id="run-1",
+        thread_id="thread-1",
+        task=None,
+        status=RunStatus.error,
+        error="run failed before checkpoint",
+    )
+    request = SimpleNamespace()
+    body = thread_runs.RunCreateRequest(config={"configurable": {"thread_id": "thread-1"}})
+
+    async def _scenario() -> dict:
+        if route_name == "thread":
+            with (
+                patch.object(thread_runs, "get_stream_bridge", return_value=object()),
+                patch.object(thread_runs, "get_run_manager", return_value=object()),
+                patch.object(thread_runs, "start_run", AsyncMock(return_value=record)),
+                patch.object(
+                    thread_runs,
+                    "build_checkpoint_state_accessor",
+                    side_effect=RuntimeError("graph construction failed"),
+                ),
+            ):
+                return await thread_runs.wait_run.__wrapped__("thread-1", body, request)
+
+        with (
+            patch.object(runs, "get_stream_bridge", return_value=object()),
+            patch.object(runs, "get_run_manager", return_value=object()),
+            patch.object(runs, "start_run", AsyncMock(return_value=record)),
+            patch.object(
+                runs,
+                "build_checkpoint_state_accessor",
+                side_effect=RuntimeError("graph construction failed"),
+            ),
+        ):
+            return await runs.stateless_wait(body, request)
+
+    result = asyncio.run(_scenario())
+
+    assert result == {"status": "error", "error": "run failed before checkpoint"}
+
+
 def test_prepare_regenerate_payload_returns_clean_input_and_base_checkpoint():
-    from app.gateway.routers.thread_runs import _prepare_regenerate_payload
+    from app.gateway.routers import thread_runs
 
     human = HumanMessage(
         id="human-1",
@@ -157,7 +391,12 @@ def test_prepare_regenerate_payload_returns_clean_input_and_base_checkpoint():
         ]
     )
 
-    response = asyncio.run(_prepare_regenerate_payload("thread-1", "ai-1", _request(checkpointer, event_store)))
+    original_builder = thread_runs.build_thread_checkpoint_state_accessor
+    thread_builder = AsyncMock(side_effect=original_builder)
+    with patch.object(thread_runs, "build_thread_checkpoint_state_accessor", thread_builder):
+        response = asyncio.run(thread_runs._prepare_regenerate_payload("thread-1", "ai-1", _request(checkpointer, event_store)))
+
+    assert [call.kwargs["thread_id"] for call in thread_builder.await_args_list] == ["thread-1", "thread-1"]
 
     assert response.checkpoint == {
         "checkpoint_ns": "",
@@ -280,6 +519,54 @@ def test_prepare_regenerate_payload_rejects_legacy_branch_when_source_checkpoint
     assert exc.value.detail == "Could not restore the regenerate checkpoint because the source branch checkpoint is unavailable"
     branch_history = asyncio.run(_collect_checkpoints(checkpointer, {"configurable": {"thread_id": branch_thread_id, "checkpoint_ns": ""}}))
     assert len(branch_history) == 1
+
+
+def test_prepare_regenerate_uses_materialized_history_when_raw_messages_are_omitted():
+    from app.gateway.routers.thread_runs import _prepare_regenerate_payload
+
+    earlier_human = HumanMessage(id="human-0", content="earlier question")
+    earlier_ai = AIMessage(id="ai-0", content="earlier answer")
+    target_human = HumanMessage(id="human-1", content="question")
+    target_ai = AIMessage(id="ai-1", content="answer")
+
+    raw_latest = _checkpoint("ckpt-ai", [])
+    raw_after_human = _checkpoint("ckpt-human", [])
+    raw_base = _checkpoint("ckpt-base", [])
+    materialized_history = [
+        _snapshot("ckpt-ai", [earlier_human, earlier_ai, target_human, target_ai]),
+        _snapshot("ckpt-human", [earlier_human, earlier_ai, target_human]),
+        _snapshot("ckpt-base", [earlier_human, earlier_ai]),
+    ]
+    checkpointer = FakeCheckpointer(
+        [raw_latest, raw_after_human, raw_base],
+        latest=raw_latest,
+        materialized_history=materialized_history,
+        materialized_latest=materialized_history[0],
+    )
+    event_store = FakeEventStore(
+        [
+            {
+                "run_id": "run-target",
+                "event_type": "ai_message",
+                "category": "message",
+                "content": {"id": "ai-1", "type": "ai", "content": "answer"},
+                "metadata": {"caller": "lead_agent"},
+            }
+        ]
+    )
+
+    response = asyncio.run(
+        _prepare_regenerate_payload(
+            "thread-1",
+            "ai-1",
+            _request(checkpointer, event_store),
+        )
+    )
+
+    assert response.checkpoint["checkpoint_id"] == "ckpt-base"
+    assert response.metadata["regenerate_checkpoint_id"] == "ckpt-base"
+    assert response.input["messages"][0]["id"] == "human-1"
+    assert checkpointer.alist_limits == [400]
 
 
 def test_prepare_regenerate_payload_rejects_non_latest_assistant():
@@ -524,5 +811,5 @@ def test_find_base_checkpoint_ignores_duration_only_checkpoints() -> None:
 
     result = asyncio.run(_find_base_checkpoint_before_human("thread-1", "human-1", _request(checkpointer, FakeEventStore([]))))
 
-    assert result is base
+    assert result.config == base.config
     assert checkpointer.alist_limits == [400]

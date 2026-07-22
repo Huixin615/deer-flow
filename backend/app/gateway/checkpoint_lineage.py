@@ -11,6 +11,10 @@ class CheckpointLineageError(RuntimeError):
 
 
 def checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    values = getattr(checkpoint_tuple, "values", None)
+    if isinstance(values, dict):
+        messages = values.get("messages", [])
+        return list(messages) if isinstance(messages, list) else []
     checkpoint = getattr(checkpoint_tuple, "checkpoint", None) or {}
     channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
     messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
@@ -51,7 +55,7 @@ def _checkpoint_identity(checkpoint_tuple: Any) -> tuple[str, str, str] | None:
 
 
 async def find_checkpoint_before_message(
-    checkpointer: Any,
+    accessor: Any,
     head_checkpoint: Any,
     message_id: str,
     *,
@@ -79,10 +83,7 @@ async def find_checkpoint_before_message(
         if not isinstance(parent_config, dict):
             raise CheckpointLineageError("Checkpoint lineage ended before the target message")
 
-        parent = await checkpointer.aget_tuple(parent_config)
-        if parent is None:
-            raise CheckpointLineageError("Checkpoint lineage references a missing parent")
-
+        parent = await accessor.aget(parent_config)
         parent_identity = _checkpoint_identity(parent)
         if parent_identity is not None:
             if parent_identity in visited:
