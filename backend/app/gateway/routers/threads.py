@@ -28,6 +28,7 @@ from app.gateway.authz import require_permission
 from app.gateway.checkpoint_lineage import (
     CheckpointLineageError,
     find_checkpoint_before_message,
+    find_checkpoint_before_message_chronologically,
     is_duration_only_checkpoint,
 )
 from app.gateway.deps import get_checkpointer, get_run_manager
@@ -217,6 +218,49 @@ async def _branch_targets_latest_turn(
             exc_info=True,
         )
     return False
+
+
+async def _find_branch_replay_base(
+    accessor: Any,
+    config: dict[str, Any],
+    snapshot: Any,
+    target_human_id: str,
+) -> Any | None:
+    """Resolve a replay base while preserving unlinked legacy histories."""
+
+    try:
+        return await find_checkpoint_before_message(
+            accessor,
+            snapshot,
+            target_human_id,
+            max_depth=_BRANCH_HISTORY_RAW_SCAN_LIMIT,
+        )
+    except CheckpointLineageError:
+        thread_id = config.get("configurable", {}).get("thread_id", "")
+        logger.debug(
+            "Could not resolve parent lineage for branch thread %s; falling back to history scan",
+            sanitize_log_param(thread_id),
+            exc_info=True,
+        )
+
+    try:
+        history = await accessor.ahistory(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT)
+    except _CHECKPOINT_MODE_ERRORS as exc:
+        thread_id = config.get("configurable", {}).get("thread_id", "")
+        raise _checkpoint_mode_http_error(exc, thread_id) from exc
+    except Exception as exc:
+        thread_id = config.get("configurable", {}).get("thread_id", "")
+        logger.exception("Failed to scan replay checkpoint history for thread %s", sanitize_log_param(thread_id))
+        raise HTTPException(status_code=500, detail="Failed to inspect checkpoint history") from exc
+
+    replay_base, target_found = find_checkpoint_before_message_chronologically(history, target_human_id)
+    if not target_found:
+        logger.warning(
+            "Could not locate branch user message %s in chronological history for thread %s",
+            sanitize_log_param(target_human_id),
+            sanitize_log_param(config.get("configurable", {}).get("thread_id", "")),
+        )
+    return replay_base
 
 
 def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
@@ -721,21 +765,12 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
     target_human_id = _message_id(target_human)
     if not target_human_id:
         raise HTTPException(status_code=409, detail="This turn can no longer be branched from.")
-    try:
-        replay_base_tuple = await find_checkpoint_before_message(
-            source_accessor,
-            snapshot,
-            target_human_id,
-            max_depth=_BRANCH_HISTORY_RAW_SCAN_LIMIT,
-        )
-    except CheckpointLineageError:
-        logger.warning(
-            "Could not resolve replay base for branch from thread %s checkpoint %s",
-            sanitize_log_param(thread_id),
-            sanitize_log_param(parent_checkpoint_id),
-            exc_info=True,
-        )
-        raise HTTPException(status_code=409, detail="This turn can no longer be branched from.") from None
+    replay_base_tuple = await _find_branch_replay_base(
+        source_accessor,
+        source_config,
+        snapshot,
+        target_human_id,
+    )
 
     # Workspace files are not checkpointed, so they only reflect the *current* thread
     # state. Cloning them onto a branch from an older turn would leak files created
@@ -794,14 +829,16 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
     }
     new_config.setdefault("metadata", {}).update(checkpoint_metadata_updates)
     try:
-        replay_base_config = await branch_accessor.aupdate(
-            new_config,
-            branch_values(replay_base_tuple),
-            as_node="branch",
-        )
-        replay_base_config.setdefault("metadata", {}).update(checkpoint_metadata_updates)
+        head_config = new_config
+        if replay_base_tuple is not None:
+            head_config = await branch_accessor.aupdate(
+                new_config,
+                branch_values(replay_base_tuple),
+                as_node="branch",
+            )
+            head_config.setdefault("metadata", {}).update(checkpoint_metadata_updates)
         await branch_accessor.aupdate(
-            replay_base_config,
+            head_config,
             branch_values(snapshot),
             as_node="branch",
         )

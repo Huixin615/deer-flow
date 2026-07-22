@@ -1392,6 +1392,116 @@ def test_branch_thread_uses_materialized_history_and_overwrites_fresh_seed(monke
     assert head_node == "branch"
 
 
+@pytest.mark.parametrize(
+    ("include_replay_base", "expected_message_ids"),
+    [
+        (True, [[], ["h1", "a1"]]),
+        (False, [["h1", "a1"]]),
+    ],
+    ids=["chronological-replay-base", "legacy-single-checkpoint"],
+)
+def test_branch_thread_preserves_unlinked_legacy_histories(
+    monkeypatch,
+    include_replay_base: bool,
+    expected_message_ids: list[list[str]],
+) -> None:
+    app, _store, _checkpointer = _build_thread_app()
+    source_thread_id = "source-unlinked"
+    messages = [
+        HumanMessage(id="h1", content="Question"),
+        AIMessage(id="a1", content="Answer"),
+    ]
+
+    def snapshot(checkpoint_id: str, snapshot_messages: list[object], *, duration_only: bool = False) -> SimpleNamespace:
+        return SimpleNamespace(
+            values={"messages": snapshot_messages},
+            config={
+                "configurable": {
+                    "thread_id": source_thread_id,
+                    "checkpoint_ns": "",
+                    "checkpoint_id": checkpoint_id,
+                }
+            },
+            metadata={"writes": {"runtime_run_duration": 1}} if duration_only else {},
+            parent_config=None,
+        )
+
+    source_history = [snapshot("ckpt-1", messages)]
+    if include_replay_base:
+        source_history.extend(
+            [
+                snapshot("ckpt-duration", [], duration_only=True),
+                snapshot("ckpt-0", []),
+            ]
+        )
+
+    history_limits: list[int | None] = []
+
+    async def source_ahistory(config, *, limit=None):
+        assert config["configurable"]["thread_id"] == source_thread_id
+        history_limits.append(limit)
+        return source_history
+
+    async def unexpected_lineage_read(_config):
+        raise AssertionError("unlinked checkpoints must use chronological history")
+
+    branch_updates: list[dict] = []
+
+    async def branch_aupdate(config, values, *, as_node=None):
+        assert as_node == "branch"
+        branch_updates.append(values)
+        return {
+            "configurable": {
+                "thread_id": config["configurable"]["thread_id"],
+                "checkpoint_ns": "",
+                "checkpoint_id": f"branch-{len(branch_updates)}",
+            }
+        }
+
+    source_accessor = SimpleNamespace(ahistory=source_ahistory, aget=unexpected_lineage_read)
+    branch_accessor = SimpleNamespace(aupdate=branch_aupdate)
+
+    def build_accessor(_request, *, thread_id, assistant_id=None, checkpoint_id=None):
+        assert thread_id == source_thread_id
+        return source_accessor, {
+            "configurable": {
+                "thread_id": source_thread_id,
+                "checkpoint_ns": "",
+            }
+        }
+
+    def build_mutation_accessor(_request, *, thread_id, as_node, checkpoint_id=None, state_schema=None):
+        return branch_accessor, {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+            }
+        }
+
+    monkeypatch.setattr(threads, "build_checkpoint_state_accessor", build_accessor)
+    monkeypatch.setattr(threads, "build_checkpoint_state_mutation_accessor", build_mutation_accessor)
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/threads",
+            json={"thread_id": source_thread_id, "metadata": {}, "assistant_id": "agent"},
+        )
+        assert created.status_code == 200, created.text
+        response = client.post(
+            f"/api/threads/{source_thread_id}/branches",
+            json={"message_id": "a1", "message_ids": ["a1"]},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["parent_checkpoint_id"] == "ckpt-1"
+    assert [[message.id for message in update["messages"].value] for update in branch_updates] == expected_message_ids
+    assert history_limits == [
+        threads._BRANCH_HISTORY_SCAN_LIMIT,
+        threads._BRANCH_HISTORY_RAW_SCAN_LIMIT,
+        threads._BRANCH_HISTORY_SCAN_LIMIT,
+    ]
+
+
 def test_branch_thread_real_mutation_graph_finishes_without_scheduling(monkeypatch) -> None:
     app, _store, _checkpointer = _build_thread_app()
     app.state.checkpoint_channel_mode = "delta"

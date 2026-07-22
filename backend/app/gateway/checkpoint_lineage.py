@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -102,6 +103,31 @@ async def find_checkpoint_before_message(
         current = parent
 
     raise CheckpointLineageError(f"Checkpoint lineage exceeded the scan limit ({max_depth})")
+
+
+def find_checkpoint_before_message_chronologically(
+    checkpoints: Sequence[Any],
+    message_id: str,
+) -> tuple[Any | None, bool]:
+    """Return ``(replay_base, target_found)`` from newest-first history.
+
+    This is a compatibility fallback for imported or legacy checkpoints that do
+    not carry ``parent_config`` links. Callers must prefer the lineage walk when
+    links are available because a chronological scan cannot distinguish sibling
+    checkpoint branches. Duration-only checkpoints are ignored, and only
+    checkpoints with an addressable id can become the replay base.
+    """
+
+    previous_checkpoint = None
+    for checkpoint_tuple in reversed(checkpoints):
+        if is_duration_only_checkpoint(checkpoint_tuple):
+            continue
+        message_ids = {_message_id(message) for message in checkpoint_messages(checkpoint_tuple)}
+        if message_id in message_ids:
+            return previous_checkpoint, True
+        if checkpoint_configurable(checkpoint_tuple).get("checkpoint_id"):
+            previous_checkpoint = checkpoint_tuple
+    return None, False
 
 
 async def copy_checkpoint_to_thread(

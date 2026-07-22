@@ -30,6 +30,7 @@ from app.gateway.checkpoint_lineage import (
     checkpoint_metadata,
     copy_checkpoint_to_thread,
     find_checkpoint_before_message,
+    find_checkpoint_before_message_chronologically,
     is_duration_only_checkpoint,
 )
 from app.gateway.deps import get_checkpointer, get_current_user, get_feedback_repo, get_run_event_store, get_run_manager, get_run_store, get_stream_bridge, get_thread_store
@@ -468,19 +469,14 @@ async def _find_base_checkpoint_before_human(
         logger.exception("Failed to list checkpoints for regenerate thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to inspect checkpoint history") from exc
 
-    previous_checkpoint = None
-    for checkpoint_tuple in reversed(checkpoints):
-        messages = _checkpoint_messages(checkpoint_tuple)
-        message_ids = {_message_id(message) for message in messages}
-        if human_message_id in message_ids:
-            if previous_checkpoint is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=_MISSING_REGENERATE_BASE_DETAIL,
-                )
-            return previous_checkpoint
-        if _checkpoint_configurable(checkpoint_tuple).get("checkpoint_id"):
-            previous_checkpoint = checkpoint_tuple
+    previous_checkpoint, target_found = find_checkpoint_before_message_chronologically(raw_checkpoints, human_message_id)
+    if target_found:
+        if previous_checkpoint is None:
+            raise HTTPException(
+                status_code=409,
+                detail=_MISSING_REGENERATE_BASE_DETAIL,
+            )
+        return previous_checkpoint
 
     if len(checkpoints) >= REGENERATE_HISTORY_SCAN_LIMIT:
         logger.warning(
