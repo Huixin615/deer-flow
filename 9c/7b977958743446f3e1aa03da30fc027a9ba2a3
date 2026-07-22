@@ -1,0 +1,23 @@
+backend/app/gateway/routers/thread_runs.py
+  s_292604db4e718b::t_732972dced0e36 28,35,51,421,429-435,495,499
+backend/app/gateway/routers/threads.py
+  s_292604db4e718b::t_003a784c3f1b35 30,186,207,239,246-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "9c7b977958743446f3e1aa03da30fc027a9ba2a3",
+  "prompts": {},
+  "sessions": {
+    "s_292604db4e718b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8553-f9d8-7741-9bc0-a541fc4c4585",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
