@@ -1,0 +1,251 @@
+.github/workflows/backend-unit-tests.yml
+  s_d47a7edc42b01d::t_8fa9859d1e45fb 17-44,50-67,82
+README.md
+  s_d47a7edc42b01d::t_a0f4d560808888 687-688,771-772,819-835
+backend/AGENTS.md
+  s_d47a7edc42b01d::t_d344211b227483 263,465-467,607,610,615,623,626-631,637-639,660-665,724-745,986
+backend/app/gateway/deps.py
+  s_d47a7edc42b01d::t_e8d2366f45570c 264,276,438
+backend/app/gateway/routers/agents.py
+  s_d47a7edc42b01d::t_55df6bf20bd448 473-474,491-495
+backend/app/gateway/routers/memory.py
+  s_d47a7edc42b01d::t_666c7b35eb1382 3,6,9,68-69,72,74-98,105,116-117,123-129,223-226,248-258,273-274,300-301,325-326,355-356,372-375,389-391
+backend/app/gateway/routers/runs.py
+  s_d47a7edc42b01d::t_d3d5d1b4a0c998 17,20,79-87
+backend/app/gateway/routers/thread_runs.py
+  s_d47a7edc42b01d::t_bb260abd940f4b 26,28,296-298,389,391,425,427,431-432,536-544
+backend/app/gateway/routers/threads.py
+  s_d47a7edc42b01d::t_5058df44579278 22-23,30-35,37,41-42,65-80,135-137,141-142,161-165,167-171,173,179-184,186-187,192,444-461,464-470,473-475,688-692,695-696,705,724-745,748,752-754,853,859-866,869-873,878,881-882,886-888,890-891,899,972-983,990,997-998,1017-1023,1025-1027,1032-1034,1037-1042,1045-1046,1048,1051,1059,1063-1071,1073-1102,1104-1111,1118,1124-1132,1134-1135,1137-1141,1175,1178,1181-1188,1193-1198,1200-1201,1204,1206,1210,1292,1306,1310-1311
+backend/app/gateway/services.py
+  s_d47a7edc42b01d::t_e9aa3e8e506ec2 33,38,46,49-55,71,75,146,167-170,509,552-556,562-820
+backend/packages/harness/deerflow/agents/__init__.py
+  s_d47a7edc42b01d::t_b0cdc27ef214a5 10,32-33,35-39
+backend/packages/harness/deerflow/agents/factory.py
+  s_d47a7edc42b01d::t_6dc0541c30e11f 25-26,74,104-109,122-129,138,157-161
+backend/packages/harness/deerflow/agents/lead_agent/agent.py
+  s_d47a7edc42b01d::t_32f2e3c424b768 48,54-59,462-482,493-496,611-621,633,681-692,706
+backend/packages/harness/deerflow/agents/memory/__init__.py
+  s_d47a7edc42b01d::t_b846b2769a02f6 16-17,19,26-28
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deer_mem.py
+  s_d47a7edc42b01d::t_fab88c717b414a 26,30,40,43,49-89,155,182,225,256-272,275,284-285,302-306,315-322,369-375,386-393,395,404-411,423-431,433
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/config.py
+  s_d47a7edc42b01d::t_2c8b3dca436a34 55-72,275
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/paths.py
+  s_d47a7edc42b01d::t_9631adaa8eb649 5-7,34-36,60,80,86-90,96-97,101-116
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/storage.py
+  s_d47a7edc42b01d::t_633a49264b051e 1-11,14-16,19-20,22,24-26,29-31,34,38-74,81,84,100-166,168-386,388,391,394-401,403-405,407-409,411-413,415-416,418-426,431-432,434-445,447-465,468-485,487-531,533-589,591,593-594,596-625,627-641,643-831,833-835,837-857,859-871,873-956,958-989,991-992,994-1015,1017-1058,1060-1170,1172-1191,1193-1207,1209-1261,1263-1366,1368-1370,1372-1376,1378-1400,1402-1444,1446-1450,1452-1456,1459-1474,1476-1477
+backend/packages/harness/deerflow/agents/memory/backends/deermem/deermem/core/updater.py
+  s_d47a7edc42b01d::t_47d07984f8ab71 23,634-641,643-646,658-697,703-735,737-741,761-762,769-804,807-808,817-831,837-846,849,855-878,901-910,912,1004-1040,1045-1050
+backend/packages/harness/deerflow/agents/memory/manager.py
+  s_d47a7edc42b01d::t_25e9c5534dd08c 44-55,182-187
+backend/packages/harness/deerflow/agents/middlewares/view_image_middleware.py
+  s_d47a7edc42b01d::t_7645b3ae190b7d 8,11,22-23,39,47-51,216-217,225-244,263,307,310-319
+backend/packages/harness/deerflow/agents/thread_state.py
+  s_d47a7edc42b01d::t_de63b576e5d60e 1-4,7-9,11,13,259-322
+backend/packages/harness/deerflow/checkpoint_patches.py
+  s_d47a7edc42b01d::t_3c240ff5e4f21a 1-99
+backend/packages/harness/deerflow/client.py
+  s_d47a7edc42b01d::t_d45e8de9c0b9b7 39,45-50,180,257,297-309,323,569,571-587,590-593,595-599,603-608,612,759-776
+backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox.py
+  s_d47a7edc42b01d::t_23e54191fc9c54 77,431-437,458-460,474-481
+backend/packages/harness/deerflow/community/e2b_sandbox/e2b_sandbox_provider.py
+  s_d47a7edc42b01d::t_b837a7aef06db8 29,38,304-305,418-419,476-478,608-619,645-647,675,681,721-766,784-791,807-808,810-812,815-817,826,839-840,845,853,855-856,876-887,890-897,918,920-927,932-940
+backend/packages/harness/deerflow/config/database_config.py
+  s_d47a7edc42b01d::t_ae355e3b4f0d7d 39-40,47-55
+backend/packages/harness/deerflow/runtime/__init__.py
+  s_d47a7edc42b01d::t_c251b6f8e1831e 8,20-22
+backend/packages/harness/deerflow/runtime/checkpoint_mode.py
+  s_d47a7edc42b01d::t_284ef0c7e29c56 1-108
+backend/packages/harness/deerflow/runtime/checkpoint_state.py
+  s_d47a7edc42b01d::t_b84d3a98ac91f4 1-187
+backend/packages/harness/deerflow/runtime/context_compaction.py
+  s_d47a7edc42b01d::t_aee1a721192709 8,12,49,63-66,69,87-95
+backend/packages/harness/deerflow/runtime/goal.py
+  s_d47a7edc42b01d::t_e889c56c54dd05 528-532
+backend/packages/harness/deerflow/runtime/runs/worker.py
+  s_d47a7edc42b01d::t_1ba68fa5e78223 33,37-42,152,291-295,311-341,448-474,588,611,615,654,658,799-809,926,989,1037,1089,1116-1163,1166,1170,1173-1180,1186,1189,1194-1195,1198-1214,1225,1487-1490,1626-1628,1630,1633
+backend/packages/harness/deerflow/sandbox/tools.py
+  s_d47a7edc42b01d::t_7dbaec0e118238 2282-2286
+backend/packages/harness/deerflow/skills/security_scanner.py
+  s_d47a7edc42b01d::t_1a2e85d6a66602 7,15,17,131-149,155
+backend/packages/harness/deerflow/tui/app.py
+  s_d47a7edc42b01d::t_8b1bdf792d1e64 23,40-41
+backend/packages/harness/deerflow/tui/command_registry.py
+  s_d47a7edc42b01d::t_93fdb697ab912e 60-70
+backend/packages/harness/pyproject.toml
+  s_d47a7edc42b01d::t_40ca29474971da 14-16,22,37,60
+backend/pyproject.toml
+  s_d47a7edc42b01d::t_bd4d77ba6dd63d 37,64-75
+backend/scripts/migrate_memory_markdown.py
+  s_d47a7edc42b01d::t_733c4f1258f6d3 1-137
+backend/tests/conftest.py
+  s_d47a7edc42b01d::t_ef743aabba20fe 96-111
+backend/tests/test_app_config_reload.py
+  s_d47a7edc42b01d::t_d28b53f168f594 16,108-121
+backend/tests/test_checkpoint_mode.py
+  s_d47a7edc42b01d::t_fd807d863f8836 1-286
+backend/tests/test_checkpoint_state.py
+  s_d47a7edc42b01d::t_f9ee17ee387c05 1-306
+backend/tests/test_checkpointer.py
+  s_d47a7edc42b01d::t_51218d2a379736 199,228
+backend/tests/test_client.py
+  s_d47a7edc42b01d::t_421942f26a2c5c 21-22,50,125-142,305-366,1033,1051-1074,1144,1391-1402,1456,1462-1469,1471-1480,1482-1486,1505-1547,1550-1552,1554-1558
+backend/tests/test_client_langfuse_metadata.py
+  s_d47a7edc42b01d::t_cf8eea6f26f48a 75
+backend/tests/test_config_version.py
+  s_d47a7edc42b01d::t_7ff83b06ae3704 6,129-175
+backend/tests/test_context_compaction.py
+  s_d47a7edc42b01d::t_447bc3cbd81d07 4,8-10,12,14,18-29,31-44,74,80,82-84,95,106,109-115,123-144,146-154,159,162-167,169-172,176-190,192-194,196-218,226-231,234-257
+backend/tests/test_create_deerflow_agent.py
+  s_d47a7edc42b01d::t_271b9e66d4c8e3 7-11,16,23-31,53-115
+backend/tests/test_custom_agent.py
+  s_d47a7edc42b01d::t_eb1b900457046e 12-14,22-27,489,496,498,508,740-755
+backend/tests/test_deermem_self_contained.py
+  s_d47a7edc42b01d::t_2542c83f4a9218 77-122,141-197,241,272-274,299-300,302-303,339
+backend/tests/test_delta_channel_checkpointers.py
+  s_d47a7edc42b01d::t_ed515b986b4b9e 1-371
+backend/tests/test_delta_channel_state.py
+  s_d47a7edc42b01d::t_242b1786d1801a 1-184
+backend/tests/test_e2b_sandbox_provider.py
+  s_d47a7edc42b01d::t_6fc5ed3fb76942 6-7,215-221,501-523,601-621,701,708-763,829,842,849,851-852,859-1078,1101,1222,1233-1307
+backend/tests/test_gateway_checkpoint_mode.py
+  s_d47a7edc42b01d::t_3178800762dc8f 1-276
+backend/tests/test_gateway_config_freshness.py
+  s_d47a7edc42b01d::t_87c0a611719417 43-56,62,173-194
+backend/tests/test_gateway_run_drain_shutdown.py
+  s_d47a7edc42b01d::t_b864f323e79e7b 199
+backend/tests/test_gateway_run_recovery.py
+  s_d47a7edc42b01d::t_99bf68b4a6fede 103,147
+backend/tests/test_gateway_services.py
+  s_d47a7edc42b01d::t_cb55ac6ba3416b 189-213,350-376,535-604,1758-1915
+backend/tests/test_goal_worker.py
+  s_d47a7edc42b01d::t_41bb5adb46fcd2 9,16-21,167,208,222-268,287,335,370,433,473,526,557
+backend/tests/test_lead_agent_model_resolution.py
+  s_d47a7edc42b01d::t_a256a9c3053cca 22-23,32,207-293
+backend/tests/test_memory_manager_pluggable.py
+  s_d47a7edc42b01d::t_e5b1f283b766e2 146
+backend/tests/test_memory_markdown_migration_cli.py
+  s_d47a7edc42b01d::t_41f4630d2afc97 1-99
+backend/tests/test_memory_router.py
+  s_d47a7edc42b01d::t_d001af61d1d585 2,10-11,92-121,180-207,248-304
+backend/tests/test_memory_storage.py
+  s_d47a7edc42b01d::t_ddbd4d01c16280 58,62,81,84,102,105,108-110,113,143,146-147,149
+backend/tests/test_memory_storage_markdown.py
+  s_d47a7edc42b01d::t_5b495461d586af 1-1189
+backend/tests/test_memory_storage_user_isolation.py
+  s_d47a7edc42b01d::t_b322e65535f1f3 8,79,82,84-87
+backend/tests/test_memory_tools.py
+  s_d47a7edc42b01d::t_3c7ef4de933a73 511,544
+backend/tests/test_run_worker_rollback.py
+  s_d47a7edc42b01d::t_9a899e0c05a5d0 5-6,9-10,13-16,18-19,24,29,41,43,47-93,195,201-222,241-303,488-500,503,507,512-518,534-642,644-655,658,662-685,687-710,714-717,719-722,727,730,734,743-748,752,756,765-766,768-770,772-789,793-811,813-817,821,825-826,830,838,840-844,848,852-853,856,864,866,868-871,875,879-880,883,890-1028,1328-1334,1336,1342,1387-1403,2013-2016
+backend/tests/test_runtime_lifecycle_e2e.py
+  s_d47a7edc42b01d::t_0a72b8c8306f59 27-28,100-121
+backend/tests/test_security_scanner.py
+  s_d47a7edc42b01d::t_490d8f53547b2c 30-63,217-271
+backend/tests/test_str_replace_empty_file.py
+  s_d47a7edc42b01d::t_393e8c3df82f05 1,8-13,37-45,47-48,51,57,59,63,70-85,87
+backend/tests/test_support_bundle.py
+  s_d47a7edc42b01d::t_90d46ac0e2b7da 301
+backend/tests/test_thread_regenerate_prepare.py
+  s_d47a7edc42b01d::t_df94900856b642 5,31,34-35,50-107,139-304,306,333-338,357-404,563
+backend/tests/test_thread_state_reducers.py
+  s_d47a7edc42b01d::t_5a81e01a964a83 16,356-368
+backend/tests/test_threads_checkpoint_mode.py
+  s_d47a7edc42b01d::t_06f4bca4f765e9 1-147
+backend/tests/test_threads_router.py
+  s_d47a7edc42b01d::t_c56698cade30b9 11,14,16,21,74-203,698-838,1165-1491,1693-1845
+backend/tests/test_tui_app.py
+  s_d47a7edc42b01d::t_64ff0b9d73c999 98-102,105-120
+backend/tests/test_tui_command_registry.py
+  s_d47a7edc42b01d::t_a5acc6643c1a1a 7,119-153
+backend/tests/test_view_image_middleware.py
+  s_d47a7edc42b01d::t_9cdc8d2abb88c7 19-20,28-32,34-37,54-61,440-442,481-617
+backend/uv.lock
+  s_d47a7edc42b01d::t_f8c0ff29a15fb1 18,819,860,960,968,970-971,1666-1714,1927,1934,1936,1955,1968,1970,2075,2085,2087,2148,2156,2158,2163,2170,2172,2193,2199,2201,2224,2228-2229,2231,2233,2235,2558,2576,2578,3210-3276,4318-4326
+config.example.yaml
+  s_d47a7edc42b01d::t_ffdcf3c5085e8b 1641-1645,1800-1802
+docs/plans/STORAGE_REWRITE_CHANGES.md
+  s_d47a7edc42b01d::t_7159ec1d3e349c 1-260
+docs/plans/STORAGE_REWRITE_PLAN.md
+  s_d47a7edc42b01d::t_c07f5604b32455 1-224
+frontend/AGENTS.md
+  s_d47a7edc42b01d::t_beb392b62e3e8e 91
+frontend/package.json
+  s_d47a7edc42b01d::t_d3416ec5380bb6 48-49,89,91
+frontend/pnpm-lock.yaml
+  s_d47a7edc42b01d::t_51be4dec3cfd96 89-94,213-214,219-220,2011-2013,2017-2019,2023-2025,2029-2031,2058-2067,3744-3746,4222-4226,5001-5002,5022-5024,5056-5058,5183-5185,5253-5254,5257,6597,7577-7582,7588-7592,7597-7600,7605-7608,7639-7648,7924,9305,9318,9329,9340,9647-9652,9655,9690,10126-10127,10450,10461,10478,10514,10578,11210,11225,11232,11267,11305,11311-11315,11397-11398,11614-11624,11696,11699-11701,11704-11705,11707,11709-11711,11713-11715
+frontend/src/app/[lang]/docs/layout.tsx
+  s_d47a7edc42b01d::t_1b49e97f245a2c 4,19,31
+frontend/src/app/blog/layout.tsx
+  s_d47a7edc42b01d::t_61ab3a406073bc 16
+frontend/src/app/layout.tsx
+  s_d47a7edc42b01d::t_ed9186069913f5 2
+frontend/src/components/docs/docs-page-map.ts
+  s_d47a7edc42b01d::t_5890a08cc75694 1-49
+frontend/src/components/workspace/artifacts/artifact-file-detail.tsx
+  s_d47a7edc42b01d::t_8b0679af9e2daf 47-50,527
+frontend/src/components/workspace/messages/markdown-content.tsx
+  s_d47a7edc42b01d::t_8b3a20c7949ead 20,22-26,37,268-271
+frontend/src/components/workspace/messages/message-group.tsx
+  s_d47a7edc42b01d::t_2f302588899805 243
+frontend/src/components/workspace/messages/message-list-item.tsx
+  s_d47a7edc42b01d::t_a19cb98ee55b87 26,292-300,378,419
+frontend/src/components/workspace/messages/message-list.tsx
+  s_d47a7edc42b01d::t_6ddf1bffbba249 381-382,466-478,487-504,1104,1139,1163,1266,1279,1298
+frontend/src/components/workspace/messages/subtask-card.tsx
+  s_d47a7edc42b01d::t_856411d5c0b229 23-30,202-205,230,247
+frontend/src/content/en/harness/lead-agent.mdx
+  s_d47a7edc42b01d::t_5ba27097a00048 36
+frontend/src/content/en/harness/subagents.mdx
+  s_d47a7edc42b01d::t_93bb954acdc67b 99
+frontend/src/content/en/index.mdx
+  s_d47a7edc42b01d::t_7d443dd30af24e 41-43,82,88,95
+frontend/src/content/en/introduction/harness-vs-app.mdx
+  s_d47a7edc42b01d::t_8bca26969b5059 98,108
+frontend/src/content/en/posts/provider-safety-termination-in-tool-agents.mdx
+  s_d47a7edc42b01d::t_1fbb62d8f53f29 17
+frontend/src/content/zh/harness/lead-agent.mdx
+  s_d47a7edc42b01d::t_484cfbbd986788 36
+frontend/src/content/zh/harness/subagents.mdx
+  s_d47a7edc42b01d::t_f3173c82bc05b3 98
+frontend/src/content/zh/posts/provider-safety-termination-in-tool-agents.mdx
+  s_d47a7edc42b01d::t_44f547dd384fb7 17
+frontend/src/core/streamdown/components.tsx
+  s_d47a7edc42b01d::t_f665e28620735a 3-5,14,16,22-43,46,52-54,60-61,63,66-80
+frontend/src/core/streamdown/plugins.ts
+  s_d47a7edc42b01d::t_1eaeca9d0383d5 1-2,20-24,26,34-38,41
+frontend/src/styles/globals.css
+  s_d47a7edc42b01d::t_da7400e17668d7 4-6
+frontend/tests/e2e/docs-localized-links.spec.ts
+  s_d47a7edc42b01d::t_f73a280a5adaeb 54-82
+frontend/tests/e2e/thread-history-mermaid.spec.ts
+  s_d47a7edc42b01d::t_4148a173e3f02b 11-14,94-111
+frontend/tests/unit/components/docs/docs-page-map.test.ts
+  s_d47a7edc42b01d::t_bdc40a6e556653 1-99
+frontend/tests/unit/components/workspace/messages/markdown-content.test.ts
+  s_d47a7edc42b01d::t_d498bb1ceac608 46,48,94-110
+frontend/tests/unit/content/docs-links.test.ts
+  s_d47a7edc42b01d::t_67ec4d0343d6bb 1-30,33-37,39-89
+frontend/tests/unit/core/streamdown-plugins.test.ts
+  s_d47a7edc42b01d::t_a725e4a776fbb6 7-11,17-20
+frontend/tests/unit/core/streamdown/plugins.test.ts
+  s_d47a7edc42b01d::t_0bfdfee55c3fa0 2-3,10-11,18-25,32-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "bd4ef021820eb70bf36188f41ad8f605386c09b5",
+  "prompts": {},
+  "sessions": {
+    "s_d47a7edc42b01d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8498-fd91-71c2-9e69-360eb4535a32",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
