@@ -1,0 +1,33 @@
+README.md
+  s_292604db4e718b::t_50b8892b3d0139 689
+README_zh.md
+  s_292604db4e718b::t_c2409055e1cd15 551
+backend/AGENTS.md
+  s_292604db4e718b::t_4be86058ea9a9a 742-743
+backend/app/gateway/checkpoint_lineage.py
+  s_292604db4e718b::t_7822c3d36457f7 6,108-132
+backend/app/gateway/routers/thread_runs.py
+  s_292604db4e718b::t_4c10fa48342e38 33,472-479
+backend/app/gateway/routers/threads.py
+  s_292604db4e718b::t_b1d3d8d7a320c4 31,223-265,768-773,832-839,841
+backend/tests/test_threads_router.py
+  s_292604db4e718b::t_babf9a4ce74c99 1395-1504
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "1fcccad1df81317c3723aa165034aa85289b7189",
+  "prompts": {},
+  "sessions": {
+    "s_292604db4e718b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8553-f9d8-7741-9bc0-a541fc4c4585",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
