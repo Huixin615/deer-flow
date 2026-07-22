@@ -59,7 +59,6 @@ import {
   isHiddenFromUIMessage,
   type MessageGroup as ThreadMessageGroup,
 } from "@/core/messages/utils";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import {
   buildMessageSidecarContext,
   type SidecarContext,
@@ -379,6 +378,8 @@ export function MessageList({
   const browserView = useMaybeBrowserView();
   const pushBrowserFrame = browserView?.pushFrame;
   const messageCount = messages.length;
+  // The backend exposes no live start timestamp, so a mid-run mount measures
+  // from mount until authoritative persisted turn_duration replaces it.
   const [turnStartTime, setTurnStartTime] = useState<number | null>(() =>
     thread.isLoading ? Date.now() : null,
   );
@@ -462,7 +463,19 @@ export function MessageList({
   const [branchingMessageId, setBranchingMessageId] = useState<string | null>(
     null,
   );
-  const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
+  const hasActiveAssistantText = useMemo(() => {
+    let lastHumanIndex = -1;
+    for (let i = groupedMessages.length - 1; i >= 0; i--) {
+      if (groupedMessages[i]?.type === "human") {
+        lastHumanIndex = i;
+        break;
+      }
+    }
+    if (lastHumanIndex === -1) return false;
+    return groupedMessages
+      .slice(lastHumanIndex)
+      .some((g) => g.type === "assistant");
+  }, [groupedMessages]);
   const updateSubtask = useUpdateSubtask();
   const lastGroupIndex = groupedMessages.length - 1;
   const turnUsageMessagesByGroupIndex =
@@ -471,6 +484,24 @@ export function MessageList({
     () => getRunDurationDisplaysByGroupIndex(groupedMessages),
     [groupedMessages],
   );
+  useEffect(() => {
+    setClientDurationsByGroupId((current) => {
+      let next: Map<string, number> | undefined;
+      runDurationDisplaysByGroupIndex.forEach((displays, groupIndex) => {
+        const groupId = groupedMessages[groupIndex]?.id;
+        if (displays.length === 0 || !groupId) {
+          return;
+        }
+        const key = `${threadId}:${groupId}`;
+        if (!current.has(key)) {
+          return;
+        }
+        next ??= new Map(current);
+        next.delete(key);
+      });
+      return next ?? current;
+    });
+  }, [groupedMessages, runDurationDisplaysByGroupIndex, threadId]);
   const tokenDebugSteps = useMemo(
     () =>
       tokenUsageInlineMode === "step_debug"
@@ -985,7 +1016,6 @@ export function MessageList({
                 group,
                 groupIndex,
                 <div
-                  key={group.id}
                   data-assistant-turn={
                     group.type === "assistant" ? "" : undefined
                   }
@@ -1071,7 +1101,7 @@ export function MessageList({
                 return withRunDuration(
                   group,
                   groupIndex,
-                  <div key={group.id} className="w-full">
+                  <div className="w-full">
                     <HumanInputCard
                       answeredResponse={answeredResponse}
                       disabled={
@@ -1106,11 +1136,10 @@ export function MessageList({
                 return withRunDuration(
                   group,
                   groupIndex,
-                  <div key={group.id} className="w-full">
+                  <div className="w-full">
                     <MarkdownContent
                       content={extractContentFromMessage(message)}
                       isLoading={thread.isLoading}
-                      rehypePlugins={rehypePlugins}
                     />
                     {renderTokenUsage({
                       messages: group.messages,
@@ -1131,12 +1160,11 @@ export function MessageList({
               return withRunDuration(
                 group,
                 groupIndex,
-                <div className="w-full" key={group.id}>
+                <div className="w-full">
                   {group.messages[0] && hasContent(group.messages[0]) && (
                     <MarkdownContent
                       content={extractContentFromMessage(group.messages[0])}
                       isLoading={thread.isLoading}
-                      rehypePlugins={rehypePlugins}
                       className="mb-4"
                     />
                   )}
@@ -1235,10 +1263,7 @@ export function MessageList({
               return withRunDuration(
                 group,
                 groupIndex,
-                <div
-                  key={"subtask-group-" + group.id}
-                  className="relative z-1 flex flex-col gap-2"
-                >
+                <div className="relative z-1 flex flex-col gap-2">
                   {results}
                   {renderTokenUsage({
                     messages: group.messages,
@@ -1251,7 +1276,7 @@ export function MessageList({
             return withRunDuration(
               group,
               groupIndex,
-              <div key={"group-" + group.id} className="w-full">
+              <div className="w-full">
                 <MessageGroup
                   messages={group.messages}
                   isLoading={groupIsLoading}
@@ -1270,7 +1295,7 @@ export function MessageList({
               </div>,
             );
           })}
-          {thread.isLoading && (
+          {thread.isLoading && !hasActiveAssistantText && (
             <div className="w-full">
               <RunActivity startTime={turnStartTime} />
             </div>

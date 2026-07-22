@@ -23,6 +23,7 @@ import {
   Reasoning,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Task, TaskTrigger } from "@/components/ai-elements/task";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,7 +45,6 @@ import {
   stripUploadedFilesTag,
   type FileInMessage,
 } from "@/core/messages/utils";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import { readReferenceMessageContexts } from "@/core/sidecar";
 import {
   parseSlashSkillReference,
@@ -288,8 +288,16 @@ function MessageContent_({
   runId?: string;
 }) {
   const { t } = useI18n();
-  const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const isHuman = message.type === "human";
+  const getReasoningMessage = useCallback(
+    (isStreaming: boolean) =>
+      isStreaming ? (
+        <Shimmer duration={1}>{t.runDuration.reasoning}</Shimmer>
+      ) : (
+        t.runDuration.reasoning
+      ),
+    [t.runDuration.reasoning],
+  );
   const components = useMemo(
     () => ({
       img: (props: ImgHTMLAttributes<HTMLImageElement>) => (
@@ -367,9 +375,7 @@ function MessageContent_({
     return (
       <AIElementMessageContent className={className}>
         <Reasoning isStreaming={isLoading}>
-          <ReasoningTrigger
-            getThinkingMessage={() => t.runDuration.reasoning}
-          />
+          <ReasoningTrigger getThinkingMessage={getReasoningMessage} />
           <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
         </Reasoning>
       </AIElementMessageContent>
@@ -410,16 +416,13 @@ function MessageContent_({
       {filesList}
       {reasoningContent && (
         <Reasoning isStreaming={isLoading}>
-          <ReasoningTrigger
-            getThinkingMessage={() => t.runDuration.reasoning}
-          />
+          <ReasoningTrigger getThinkingMessage={getReasoningMessage} />
           <SafeReasoningContent>{reasoningContent}</SafeReasoningContent>
         </Reasoning>
       )}
       <MarkdownContent
         content={contentToDisplay}
         isLoading={isLoading}
-        rehypePlugins={rehypePlugins}
         className="my-3"
         components={components}
       />
