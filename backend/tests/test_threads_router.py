@@ -1321,7 +1321,7 @@ def test_branch_thread_uses_materialized_history_and_overwrites_fresh_seed(monke
 
     async def source_ahistory(config, *, limit=None):
         assert config["configurable"]["thread_id"] == source_thread_id
-        assert limit == 200
+        assert limit == threads._BRANCH_HISTORY_RAW_SCAN_LIMIT
         return source_history
 
     async def source_aget(config):
@@ -1496,10 +1496,59 @@ def test_branch_thread_preserves_unlinked_legacy_histories(
     assert response.json()["parent_checkpoint_id"] == "ckpt-1"
     assert [[message.id for message in update["messages"].value] for update in branch_updates] == expected_message_ids
     assert history_limits == [
-        threads._BRANCH_HISTORY_SCAN_LIMIT,
         threads._BRANCH_HISTORY_RAW_SCAN_LIMIT,
-        threads._BRANCH_HISTORY_SCAN_LIMIT,
+        threads._BRANCH_HISTORY_RAW_SCAN_LIMIT,
+        threads._BRANCH_HISTORY_RAW_SCAN_LIMIT,
     ]
+
+
+def test_branch_history_scans_budget_for_duration_only_checkpoints() -> None:
+    target = SimpleNamespace(
+        values={
+            "messages": [
+                HumanMessage(id="h1", content="Question"),
+                AIMessage(id="a1", content="Answer"),
+            ]
+        },
+        config={
+            "configurable": {
+                "thread_id": "source-duration-budget",
+                "checkpoint_ns": "",
+                "checkpoint_id": "target",
+            }
+        },
+        metadata={},
+    )
+    duration_only = [
+        SimpleNamespace(
+            values={"messages": []},
+            config={
+                "configurable": {
+                    "thread_id": "source-duration-budget",
+                    "checkpoint_ns": "",
+                    "checkpoint_id": f"duration-{index}",
+                }
+            },
+            metadata={"writes": {"runtime_run_duration": index}},
+        )
+        for index in range(threads._BRANCH_HISTORY_SCAN_LIMIT)
+    ]
+    history = [*duration_only, target]
+    limits: list[int | None] = []
+
+    async def ahistory(_config, *, limit=None):
+        limits.append(limit)
+        return history[:limit]
+
+    accessor = SimpleNamespace(ahistory=ahistory)
+    config = {"configurable": {"thread_id": "source-duration-budget", "checkpoint_ns": ""}}
+
+    found = asyncio.run(threads._find_branch_checkpoint(accessor, config, {"a1"}))
+    targets_latest = asyncio.run(threads._branch_targets_latest_turn(accessor, config, {"a1"}))
+
+    assert found is target
+    assert targets_latest is True
+    assert limits == [threads._BRANCH_HISTORY_RAW_SCAN_LIMIT, threads._BRANCH_HISTORY_RAW_SCAN_LIMIT]
 
 
 def test_branch_thread_real_mutation_graph_finishes_without_scheduling(monkeypatch) -> None:
@@ -1635,6 +1684,7 @@ def _wire_extension_agent(monkeypatch, app, checkpointer, mode):
     monkeypatch.setattr(threads, "build_checkpoint_state_mutation_accessor", gateway_services.build_checkpoint_state_mutation_accessor)
     monkeypatch.setattr(threads, "build_thread_checkpoint_state_accessor", gateway_services.build_thread_checkpoint_state_accessor)
     monkeypatch.setattr(threads, "build_thread_checkpoint_state_mutation_accessor", gateway_services.build_thread_checkpoint_state_mutation_accessor)
+    monkeypatch.setattr(thread_runs, "build_thread_checkpoint_state_accessor", gateway_services.build_thread_checkpoint_state_accessor)
     return custom_factory
 
 
@@ -1650,6 +1700,24 @@ async def _seed_extension_source(checkpointer, custom_factory, mode, source_thre
         {"messages": [AIMessage(id="a1", content="answer")], "ext_list": ["payload"]},
         as_node="model",
     )
+    await accessor.aupdate(
+        {"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}},
+        {
+            "messages": [
+                HumanMessage(
+                    id="h2",
+                    content="follow-up",
+                    additional_kwargs={"run_id": "source-run"},
+                )
+            ]
+        },
+        as_node="model",
+    )
+    await accessor.aupdate(
+        {"configurable": {"thread_id": source_thread_id, "checkpoint_ns": ""}},
+        {"messages": [AIMessage(id="a2", content="follow-up answer")]},
+        as_node="model",
+    )
 
 
 @pytest.mark.parametrize("mode", ["full", "delta"])
@@ -1658,10 +1726,22 @@ def test_state_endpoints_preserve_extension_reducer_channels(monkeypatch, mode) 
 
     GET /state must return the extension value (resolved via the thread's
     assistant_id), POST /state must replace it, and branch must preserve it
-    byte-for-byte by copying reducer channels with Overwrite semantics.
+    byte-for-byte by copying reducer channels with Overwrite semantics. The
+    copied pre-user checkpoint must also remain materializable for regenerate.
     """
     app, _store, checkpointer = _build_thread_app()
+    app.include_router(thread_runs.router)
     custom_factory = _wire_extension_agent(monkeypatch, app, checkpointer, mode)
+
+    async def list_messages(_thread_id: str, *, limit: int, **_kwargs) -> list[dict]:
+        assert limit == thread_runs.REGENERATE_HISTORY_SCAN_LIMIT
+        return []
+
+    async def list_by_thread(_thread_id: str, *, user_id=None, limit: int = 100) -> list:
+        return []
+
+    app.state.run_event_store = SimpleNamespace(list_messages=list_messages)
+    app.state.run_manager = SimpleNamespace(list_by_thread=list_by_thread)
 
     recorded_updates: list[dict] = []
     real_mutation_builder = gateway_services.build_checkpoint_state_mutation_accessor
@@ -1705,10 +1785,16 @@ def test_state_endpoints_preserve_extension_reducer_channels(monkeypatch, mode) 
 
         branch_response = client.post(
             f"/api/threads/{source_thread_id}/branches",
-            json={"message_id": "a1", "message_ids": ["a1"]},
+            json={"message_id": "a2", "message_ids": ["a2"]},
         )
         assert branch_response.status_code == 200, branch_response.text
         branch_thread_id = branch_response.json()["thread_id"]
+
+        prepare_response = client.post(
+            f"/api/threads/{branch_thread_id}/runs/regenerate/prepare",
+            json={"message_id": "a2"},
+        )
+        assert prepare_response.status_code == 200, prepare_response.text
 
     # The branch write must copy every reducer channel with replace semantics.
     branch_update = recorded_updates[-1]
@@ -1723,7 +1809,24 @@ def test_state_endpoints_preserve_extension_reducer_channels(monkeypatch, mode) 
 
     branch_values = asyncio.run(materialize(branch_thread_id))
     assert branch_values["ext_list"] == ["replaced"]
-    assert [message.id for message in branch_values["messages"]] == ["h1", "a1"]
+    assert [message.id for message in branch_values["messages"]] == ["h1", "a1", "h2", "a2"]
+
+    prepared = prepare_response.json()
+    assert prepared["target_run_id"] == "source-run"
+    assert prepared["input"]["messages"][0]["id"] == "h2"
+    base_accessor = CheckpointStateAccessor.bind(custom_factory(), checkpointer, mode=mode)
+    base_values = asyncio.run(
+        base_accessor.aget(
+            {
+                "configurable": {
+                    "thread_id": branch_thread_id,
+                    "checkpoint_ns": prepared["checkpoint"]["checkpoint_ns"],
+                    "checkpoint_id": prepared["checkpoint"]["checkpoint_id"],
+                }
+            }
+        )
+    ).values
+    assert [message.id for message in base_values["messages"]] == ["h1", "a1"]
 
 
 def test_update_thread_state_rejects_unknown_state_fields(monkeypatch) -> None:

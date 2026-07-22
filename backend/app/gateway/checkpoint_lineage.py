@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-import copy
 from collections.abc import Sequence
 from typing import Any
 
 
 class CheckpointLineageError(RuntimeError):
     """Raised when a requested checkpoint ancestor cannot be resolved safely."""
+
+
+class CheckpointParentMissingError(CheckpointLineageError):
+    """Raised when a legacy checkpoint does not record its parent link."""
+
+
+class CheckpointLineageIntegrityError(CheckpointLineageError):
+    """Raised when recorded checkpoint lineage is present but unsafe to use."""
 
 
 def checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
@@ -45,14 +52,36 @@ def _message_id(message: Any) -> str | None:
     return str(value) if value else None
 
 
-def _checkpoint_identity(checkpoint_tuple: Any) -> tuple[str, str, str] | None:
-    configurable = checkpoint_configurable(checkpoint_tuple)
+def _config_identity(config: dict[str, Any]) -> tuple[str, str, str] | None:
+    configurable = config.get("configurable", {})
     thread_id = configurable.get("thread_id")
     checkpoint_ns = configurable.get("checkpoint_ns", "")
     checkpoint_id = configurable.get("checkpoint_id")
     if not isinstance(thread_id, str) or not thread_id or not isinstance(checkpoint_id, str) or not checkpoint_id:
         return None
     return thread_id, str(checkpoint_ns or ""), checkpoint_id
+
+
+def _checkpoint_identity(checkpoint_tuple: Any) -> tuple[str, str, str] | None:
+    return _config_identity(getattr(checkpoint_tuple, "config", {}) or {})
+
+
+def _checkpoint_exists(checkpoint_tuple: Any) -> bool:
+    """Distinguish a persisted empty checkpoint from an accessor miss.
+
+    LangGraph represents a missing explicit ``checkpoint_id`` as an empty
+    snapshot that echoes the requested config. Persisted snapshots always
+    carry metadata, a creation timestamp, or a raw checkpoint payload.
+    """
+
+    explicit = getattr(checkpoint_tuple, "checkpoint_exists", None)
+    if isinstance(explicit, bool):
+        return explicit
+    if getattr(checkpoint_tuple, "metadata", None) is not None:
+        return True
+    if getattr(checkpoint_tuple, "created_at", None) is not None:
+        return True
+    return isinstance(getattr(checkpoint_tuple, "checkpoint", None), dict)
 
 
 async def find_checkpoint_before_message(
@@ -71,7 +100,7 @@ async def find_checkpoint_before_message(
     """
 
     if message_id not in {_message_id(message) for message in checkpoint_messages(head_checkpoint)}:
-        raise CheckpointLineageError("Target message is not present in the checkpoint head")
+        raise CheckpointLineageIntegrityError("Target message is not present in the checkpoint head")
 
     current = head_checkpoint
     visited: set[tuple[str, str, str]] = set()
@@ -82,13 +111,16 @@ async def find_checkpoint_before_message(
     for _ in range(max_depth):
         parent_config = getattr(current, "parent_config", None)
         if not isinstance(parent_config, dict):
-            raise CheckpointLineageError("Checkpoint lineage ended before the target message")
+            raise CheckpointParentMissingError("Checkpoint lineage ended before the target message")
 
         parent = await accessor.aget(parent_config)
         parent_identity = _checkpoint_identity(parent)
+        requested_parent_identity = _config_identity(parent_config)
+        if parent_identity is None or not _checkpoint_exists(parent) or (requested_parent_identity is not None and parent_identity != requested_parent_identity):
+            raise CheckpointLineageIntegrityError("Checkpoint parent link is not addressable")
         if parent_identity is not None:
             if parent_identity in visited:
-                raise CheckpointLineageError("Checkpoint lineage contains a cycle")
+                raise CheckpointLineageIntegrityError("Checkpoint lineage contains a cycle")
             visited.add(parent_identity)
 
         if is_duration_only_checkpoint(parent):
@@ -97,12 +129,10 @@ async def find_checkpoint_before_message(
 
         parent_message_ids = {_message_id(message) for message in checkpoint_messages(parent)}
         if message_id not in parent_message_ids:
-            if parent_identity is None:
-                raise CheckpointLineageError("Checkpoint before the target message is not addressable")
             return parent
         current = parent
 
-    raise CheckpointLineageError(f"Checkpoint lineage exceeded the scan limit ({max_depth})")
+    raise CheckpointLineageIntegrityError(f"Checkpoint lineage exceeded the scan limit ({max_depth})")
 
 
 def find_checkpoint_before_message_chronologically(
@@ -128,29 +158,3 @@ def find_checkpoint_before_message_chronologically(
         if checkpoint_configurable(checkpoint_tuple).get("checkpoint_id"):
             previous_checkpoint = checkpoint_tuple
     return None, False
-
-
-async def copy_checkpoint_to_thread(
-    checkpointer: Any,
-    source_checkpoint: Any,
-    target_thread_id: str,
-    *,
-    metadata_updates: dict[str, Any],
-    parent_config: dict[str, Any] | None = None,
-    checkpoint_id: str | None = None,
-) -> dict[str, Any]:
-    """Deep-copy a checkpoint into another thread and return its local config."""
-
-    checkpoint = copy.deepcopy(getattr(source_checkpoint, "checkpoint", None) or {})
-    metadata = checkpoint_metadata(source_checkpoint)
-    metadata = copy.deepcopy(metadata)
-    source_checkpoint_id = checkpoint_configurable(source_checkpoint).get("checkpoint_id")
-    local_checkpoint_id = checkpoint_id or source_checkpoint_id
-    if not isinstance(local_checkpoint_id, str) or not local_checkpoint_id:
-        raise CheckpointLineageError("Source checkpoint is missing checkpoint_id")
-
-    checkpoint["id"] = local_checkpoint_id
-    metadata.update(metadata_updates)
-    write_config = parent_config or {"configurable": {"thread_id": target_thread_id, "checkpoint_ns": ""}}
-    new_versions = dict(checkpoint.get("channel_versions", {}) or {})
-    return await checkpointer.aput(write_config, checkpoint, metadata, new_versions)

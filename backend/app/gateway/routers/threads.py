@@ -27,6 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from app.gateway.authz import require_permission
 from app.gateway.checkpoint_lineage import (
     CheckpointLineageError,
+    CheckpointParentMissingError,
     find_checkpoint_before_message,
     find_checkpoint_before_message_chronologically,
     is_duration_only_checkpoint,
@@ -182,7 +183,7 @@ async def _find_branch_checkpoint(
     target_message_ids: set[str],
 ) -> Any:
     try:
-        for snapshot in await accessor.ahistory(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+        for snapshot in await accessor.ahistory(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT):
             if is_duration_only_checkpoint(snapshot):
                 continue
             if _matches_branch_target(_checkpoint_messages(snapshot), target_message_ids):
@@ -203,7 +204,7 @@ async def _branch_targets_latest_turn(
 ) -> bool:
     """Return whether the target turn is the final visible turn."""
     try:
-        for snapshot in await accessor.ahistory(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+        for snapshot in await accessor.ahistory(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT):
             if is_duration_only_checkpoint(snapshot):
                 continue
             messages = _checkpoint_messages(snapshot)
@@ -235,13 +236,21 @@ async def _find_branch_replay_base(
             target_human_id,
             max_depth=_BRANCH_HISTORY_RAW_SCAN_LIMIT,
         )
-    except CheckpointLineageError:
+    except CheckpointParentMissingError:
         thread_id = config.get("configurable", {}).get("thread_id", "")
         logger.debug(
             "Could not resolve parent lineage for branch thread %s; falling back to history scan",
             sanitize_log_param(thread_id),
             exc_info=True,
         )
+    except CheckpointLineageError as exc:
+        thread_id = config.get("configurable", {}).get("thread_id", "")
+        logger.warning(
+            "Rejected unsafe checkpoint lineage for branch thread %s",
+            sanitize_log_param(thread_id),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=409, detail="This turn can no longer be branched from.") from exc
 
     try:
         history = await accessor.ahistory(config, limit=_BRANCH_HISTORY_RAW_SCAN_LIMIT)
