@@ -165,6 +165,7 @@ def _patch_checkpoint_state_builder(monkeypatch):
     monkeypatch.setattr(threads, "build_checkpoint_state_mutation_accessor", _mutation_builder)
     monkeypatch.setattr(threads, "build_thread_checkpoint_state_accessor", _read_boundary)
     monkeypatch.setattr(threads, "build_thread_checkpoint_state_mutation_accessor", _mutation_boundary)
+    monkeypatch.setattr(thread_runs, "build_thread_checkpoint_state_accessor", _read_boundary)
 
 
 class _FakeStateAccessor:
