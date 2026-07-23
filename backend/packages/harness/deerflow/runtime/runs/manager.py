@@ -1100,7 +1100,10 @@ class RunManager:
 
         Rows with a still-valid lease are skipped — they belong to another live
         worker. Rows with a NULL lease (pre-ownership data) are reclaimed as
-        well, matching the original single-worker recovery behaviour.
+        well, matching the original single-worker recovery behaviour. The
+        candidate scan is only an optimization: each row is claimed with a
+        lease-aware conditional update so a heartbeat renewal after the scan
+        always wins over reconciliation.
         """
         if self._store is None:
             return []
@@ -1130,13 +1133,28 @@ class RunManager:
                     # Still owned by a local task — skip
                     continue
 
+            try:
+                claimed = await self._call_store_with_retry(
+                    "claim_for_takeover",
+                    record.run_id,
+                    lambda: self._store.claim_for_takeover(
+                        record.run_id,
+                        grace_seconds=grace_seconds,
+                        error=error,
+                    ),
+                )
+            except Exception:
+                logger.warning("Failed to claim orphaned run %s during reconciliation", record.run_id, exc_info=True)
+                continue
+            if not claimed:
+                # Expected when the owner renewed after the candidate scan,
+                # the run finished, or another reconciler won the claim.
+                logger.debug("Skipped orphaned run %s because its takeover claim no longer matched", record.run_id)
+                continue
+
             record.status = RunStatus.error
             record.error = error
             record.updated_at = now
-            persisted = await self._persist_status(record, RunStatus.error, error=error)
-            if not persisted:
-                logger.warning("Skipped orphaned run %s recovery because error status was not persisted", record.run_id)
-                continue
             recovered.append(record)
 
         if recovered:

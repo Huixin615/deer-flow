@@ -276,6 +276,8 @@ DeerFlow still uses `Forwarded` / `X-Forwarded-*` headers to recover the browser
 
 > [!IMPORTANT]
 > The Gateway still owns active run tasks in process, so production defaults to a single Gateway worker (`GATEWAY_WORKERS=1`). The Redis stream bridge (`stream_bridge.type: redis`) shares SSE delivery and `Last-Event-ID` replay across workers, with a rolling retained-buffer TTL (`stream_ttl_seconds`) as a cleanup safety net. Malformed reconnect IDs live-tail new events instead of replaying the retained buffer. It does not make run cancellation, request de-duplication, or IM channel state fully cross-worker by itself; use single-worker Gateway or explicit sticky routing/ownership before raising `GATEWAY_WORKERS`.
+>
+> Deployments that enable run-ownership heartbeats reconcile expired leases with an atomic takeover claim. The claim re-checks the lease after candidate selection, so a successful owner renewal wins over orphan recovery and only one reconciler can report a run as recovered.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed Docker development guide.
 
