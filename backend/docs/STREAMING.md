@@ -82,7 +82,7 @@ flowchart LR
 | `custom` | 用户代码显式调用 `StreamWriter.write()` | 任意 dict | 应用定义 |
 | `on_custom_event` | 用户代码调用 `dispatch_custom_event()`；通过 `astream_events(version="v2")` 消费 | `name` + 任意 `data` | 应用定义 |
 
-DeerFlow 自身产生的事件必须通过 `deerflow.utils.custom_events` 的同步或异步 helper 发送。helper 先写入 `custom` stream，再 best-effort dispatch callback；callback 名称取 payload 的非空字符串 `type`，`data` 保留完整 payload。这样原生 Gateway / Web UI / `DeerFlowClient` 的 custom 事件不变，`astream_events` 消费者也能观察同一事件。callback dispatch 的普通异常只记 debug 日志，不允许打断原有 writer 链路；writer 的异常语义保持不变。
+DeerFlow 自身产生的事件必须通过 `deerflow.utils.custom_events` 的同步或异步 helper 发送，并且每个内置 payload 必须携带非空字符串 `type`；缺少合法 `type` 的 payload 只进入 `custom` stream，不会出现在 `astream_events`。helper 先写入 `custom` stream，再 best-effort dispatch callback；callback 名称取 payload 的 `type`，`data` 保留完整 payload。这样原生 Gateway / Web UI / `DeerFlowClient` 的 custom 事件不变，`astream_events` 消费者也能观察同一事件。callback dispatch 的普通异常只记 debug 日志，不允许打断原有 writer 链路；writer 的异常语义保持不变。
 
 ### 两套命名的由来
 
