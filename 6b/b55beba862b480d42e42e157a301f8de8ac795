@@ -1,0 +1,33 @@
+CHANGELOG.md
+  s_317f864551f389::t_7f9653a77d31f3 196-198,1115
+README.md
+  s_317f864551f389::t_4cd14d59924df8 279-280
+backend/AGENTS.md
+  s_317f864551f389::t_ba642741a6c14a 444
+backend/packages/harness/deerflow/runtime/runs/manager.py
+  s_317f864551f389::t_e1ded93a97e5ff 1103-1106,1136-1154
+backend/tests/test_multi_worker_run_ownership.py
+  s_317f864551f389::t_b25a1db3b5d18f 263-348
+backend/tests/test_run_manager.py
+  s_317f864551f389::t_81ba39da67eccf 64-65,69,71-72,304-306,321
+backend/tests/test_run_repository.py
+  s_317f864551f389::t_53cf14f0701871 860-900
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "6bb55beba862b480d42e42e157a301f8de8ac795",
+  "prompts": {},
+  "sessions": {
+    "s_317f864551f389": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8fb0-15ad-7e80-aaca-caf807cb262f",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
