@@ -1,0 +1,43 @@
+CHANGELOG.md
+  s_d073282d9d508d::t_f82c65ef479efb 241-246,1114
+README.md
+  s_d073282d9d508d::t_070b1246d94d3f 278
+backend/AGENTS.md
+  s_d073282d9d508d::t_1faa03a5fb1246 444
+backend/packages/harness/deerflow/persistence/run/sql.py
+  s_d073282d9d508d::t_634e04077a5fd2 318-322,324-331
+backend/packages/harness/deerflow/runtime/runs/manager.py
+  s_d073282d9d508d::t_c126bde61cd375 184-187,343-349,369-375,382-387,443,446-448,466-481,503,714-720,727-735,1247-1298,1378-1384,1403-1412,1414-1416,1418-1423,1425-1430,1450-1453,1455-1465
+backend/packages/harness/deerflow/runtime/runs/store/base.py
+  s_d073282d9d508d::t_ba821444ded187 131-133
+backend/packages/harness/deerflow/runtime/runs/store/memory.py
+  s_d073282d9d508d::t_336a042726b502 137-151
+backend/packages/harness/deerflow/runtime/runs/worker.py
+  s_d073282d9d508d::t_dfdbb8d920989f 432-434,486-488,830-835,838,841,854,867,876,890,908,915
+backend/tests/test_multi_worker_run_ownership.py
+  s_d073282d9d508d::t_3755be30a178d9 418-521,1436-1437,1509-1562
+backend/tests/test_run_repository.py
+  s_d073282d9d508d::t_2b2b5bf9bd7127 238-252
+backend/tests/test_run_worker_rollback.py
+  s_d073282d9d508d::t_a0b0272886453f 6,2797-2838
+config.example.yaml
+  s_d073282d9d508d::t_a4a8ddeb504ca4 1886-1890
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d76058544527a423e8b5735b7f9c9b41221f75d9",
+  "prompts": {},
+  "sessions": {
+    "s_d073282d9d508d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8fdc-5a67-75c1-9bf1-ead8caf6ac64",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
