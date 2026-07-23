@@ -1,0 +1,33 @@
+README.md
+  s_3a815253ada664::t_8f7ac0bc0b0e81 335-336
+backend/AGENTS.md
+  s_3a815253ada664::t_f0877dee9616b6 927,929
+backend/docs/STREAMING.md
+  s_3a815253ada664::t_a7c0a49c30cc07 10,68-70,75,83-85,302-303
+backend/packages/harness/deerflow/tools/builtins/task_tool.py
+  s_3a815253ada664::t_07b9f64ee2b2f6 35,423,429-430,439-442,468,477-478,487,494-495,513,520-521,539,546-547,561,568-569,594,600-601
+backend/packages/harness/deerflow/utils/custom_events.py
+  s_3a815253ada664::t_7b0a695128bb7e 1-57
+backend/tests/test_custom_events.py
+  s_3a815253ada664::t_f7784044e4301c 1-196
+backend/tests/test_task_tool_core_logic.py
+  s_3a815253ada664::t_9154c9fa9da005 502,506-509,537,566,1711-1715,1727,1743
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "66c9617b74ef3e8398237c86d103841262ffeab1",
+  "prompts": {},
+  "sessions": {
+    "s_3a815253ada664": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8d06-c57d-78c1-992c-a829ea4f165b",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
