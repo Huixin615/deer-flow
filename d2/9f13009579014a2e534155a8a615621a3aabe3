@@ -1,0 +1,27 @@
+backend/AGENTS.md
+  s_3a815253ada664::t_18285f015df9f2 929
+backend/docs/STREAMING.md
+  s_3a815253ada664::t_82b138ef777379 85
+backend/tests/test_custom_events.py
+  s_3a815253ada664::t_9155adabddaa17 4-6,10-13,19,23-24,79-176
+backend/tests/test_safety_finish_reason_graph_integration.py
+  s_3a815253ada664::t_4e88e1d6f00591 23,144-179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d29f13009579014a2e534155a8a615621a3aabe3",
+  "prompts": {},
+  "sessions": {
+    "s_3a815253ada664": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8d06-c57d-78c1-992c-a829ea4f165b",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
