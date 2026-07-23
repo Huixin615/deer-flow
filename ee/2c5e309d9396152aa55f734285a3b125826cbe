@@ -1,0 +1,75 @@
+.agent/skills/engineer-system-change/SKILL.md
+  s_3a815253ada664::t_9a48fb91851045 1-134
+README.md
+  s_3a815253ada664::t_67dc4cbd24b1bd 695-696
+backend/AGENTS.md
+  s_3a815253ada664::t_ff14e2bad79de9 349,419,824-861
+backend/app/gateway/routers/github_webhooks.py
+  s_3a815253ada664::t_f224bf194e3450 190-210,337-339,341-350
+backend/app/gateway/routers/threads.py
+  s_3a815253ada664::t_ac1aa8fbfda1a4 28,57,419-421,775-797,808
+backend/packages/harness/deerflow/agents/middlewares/safety_finish_reason_middleware.py
+  s_3a815253ada664::t_03484275401003 1-2,4-5,17-32,67,83-87,99-100,170-173,341-360,367-368,381,383,390
+backend/packages/harness/deerflow/runtime/journal.py
+  s_3a815253ada664::t_4cc7f8f4bf93bb 23,29,56-151
+backend/scripts/benchmark/bench_checkpoint_channels.py
+  s_3a815253ada664::t_4562cad5d1ad65 1-717
+backend/scripts/benchmark/summarize_checkpoint_channels.py
+  s_3a815253ada664::t_87c7d7ea7e5fe8 1-196
+backend/tests/test_bench_checkpoint_channels.py
+  s_3a815253ada664::t_7b202cb8e651fd 1-281
+backend/tests/test_branch_history_seed.py
+  s_3a815253ada664::t_78994d7cda157f 1-181
+backend/tests/test_github_webhooks.py
+  s_3a815253ada664::t_e9c8527be008e3 550,553-568
+backend/tests/test_safety_finish_reason_graph_integration.py
+  s_3a815253ada664::t_fb381b3e8f8713 219-268
+backend/tests/test_safety_finish_reason_middleware.py
+  s_3a815253ada664::t_08109fc39fc9d6 117-203
+backend/tests/test_summarize_checkpoint_channels.py
+  s_3a815253ada664::t_50e7b00851abd7 1-168
+backend/tests/test_threads_router.py
+  s_3a815253ada664::t_30c532fdfab99f 1468-1572
+frontend/AGENTS.md
+  s_3a815253ada664::t_4aa94f92dc84db 74-75
+frontend/src/components/workspace/messages/message-list-item.tsx
+  s_3a815253ada664::t_f2fa925da7a080 26,290,292-299,377-378,417-422
+frontend/src/components/workspace/messages/message-list.tsx
+  s_3a815253ada664::t_9c6fa6b4f793da 18,37-40,92,125-134,150-151,376-389,394-415,418-419,483-504,954-994,1015-1017,1084,1101-1104,1131,1136-1139,1148,1151,1160-1163,1176,1263-1266,1273,1276-1279,1295,1300
+frontend/src/components/workspace/messages/run-duration.tsx
+  s_3a815253ada664::t_aa75c4c17cfb48 1-59
+frontend/src/core/i18n/locales/en-US.ts
+  s_3a815253ada664::t_547f83e89f8fb8 60-72
+frontend/src/core/i18n/locales/types.ts
+  s_3a815253ada664::t_5f1fd908e3fc92 49-60
+frontend/src/core/i18n/locales/zh-CN.ts
+  s_3a815253ada664::t_05344b25c36481 60-71
+frontend/src/core/messages/run-duration.ts
+  s_3a815253ada664::t_bbc89feea96ac2 1-104
+frontend/src/core/threads/hooks.ts
+  s_3a815253ada664::t_7e49acdef37c8d 21,320,323-326,421-426,428-429,432-440
+frontend/tests/e2e/thread-history.spec.ts
+  s_3a815253ada664::t_cf3b86bf309b70 97-144
+frontend/tests/unit/core/messages/run-duration.test.ts
+  s_3a815253ada664::t_85a8e46d41dde9 1-138
+frontend/tests/unit/core/threads/message-merge.test.ts
+  s_3a815253ada664::t_85580ed720fe9b 99-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "ee2c5e309d9396152aa55f734285a3b125826cbe",
+  "prompts": {},
+  "sessions": {
+    "s_3a815253ada664": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8d06-c57d-78c1-992c-a829ea4f165b",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
