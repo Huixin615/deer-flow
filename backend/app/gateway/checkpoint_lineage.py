@@ -108,6 +108,10 @@ async def find_checkpoint_before_message(
     if current_identity is not None:
         visited.add(current_identity)
 
+    # Each step performs one ancestor read, but normal branch/regenerate
+    # histories cross the target boundary within 1–3 reads. Keep max_depth as
+    # a conservative safety cap for valid histories with many intermediate or
+    # duration-only checkpoints.
     for _ in range(max_depth):
         parent_config = getattr(current, "parent_config", None)
         if not isinstance(parent_config, dict):

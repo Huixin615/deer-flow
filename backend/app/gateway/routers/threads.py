@@ -830,6 +830,8 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
                 values[key] = value
         return values
 
+    # Stamp both synthetic checkpoints with the branch-creation time because
+    # serializers fall back to metadata when snapshot.created_at is absent.
     checkpoint_metadata_updates = {
         **branch_metadata,
         "source": "branch",
