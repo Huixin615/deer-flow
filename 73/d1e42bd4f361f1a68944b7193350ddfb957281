@@ -1,0 +1,53 @@
+README.md
+  s_ab3537005c9a57::t_942b71029f7939 278
+backend/AGENTS.md
+  s_ab3537005c9a57::t_b08066a983ef83 444
+backend/app/gateway/services.py
+  s_ab3537005c9a57::t_e6c60aa77ab32a 45,1123,1129-1143,1162,1200,1202-1225
+backend/docs/API.md
+  s_ab3537005c9a57::t_7457ad098ee9c4 786-808
+backend/docs/STREAMING.md
+  s_ab3537005c9a57::t_5fb03c6ecdfdc0 140,146-159
+backend/packages/harness/deerflow/runtime/__init__.py
+  s_ab3537005c9a57::t_3b5667be6451ce 17,56-57
+backend/packages/harness/deerflow/runtime/stream_bridge/__init__.py
+  s_ab3537005c9a57::t_da17b642f1c353 11,28-29
+backend/packages/harness/deerflow/runtime/stream_bridge/base.py
+  s_ab3537005c9a57::t_d9ebce01f28392 33-47,50,73,78-79
+backend/packages/harness/deerflow/runtime/stream_bridge/memory.py
+  s_ab3537005c9a57::t_0562a40882d1de 7,13,16,61-62,64,66-74,85-86,127,130-142,148,150,152-153,155-163,165-170,176-177
+backend/tests/test_gateway_services.py
+  s_ab3537005c9a57::t_90217278f2feab 5,7,54-118
+backend/tests/test_wait_disconnect_handling.py
+  s_ab3537005c9a57::t_c1191e5fead887 114-143
+config.example.yaml
+  s_ab3537005c9a57::t_796bd77e2d8864 1907-1908,1913-1914
+frontend/AGENTS.md
+  s_ab3537005c9a57::t_7f3c7775174b77 92
+frontend/src/core/i18n/locales/en-US.ts
+  s_ab3537005c9a57::t_357e8919017219 508-509
+frontend/src/core/i18n/locales/types.ts
+  s_ab3537005c9a57::t_9f0c2a620ad501 407
+frontend/src/core/i18n/locales/zh-CN.ts
+  s_ab3537005c9a57::t_712484b3442411 485
+frontend/src/core/threads/hooks.ts
+  s_ab3537005c9a57::t_df03e6c03cdfe1 26,1055,1195-1213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "73d1e42bd4f361f1a68944b7193350ddfb957281",
+  "prompts": {},
+  "sessions": {
+    "s_ab3537005c9a57": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8f61-6e3e-79a1-90f0-2ebf8e7e07de",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
