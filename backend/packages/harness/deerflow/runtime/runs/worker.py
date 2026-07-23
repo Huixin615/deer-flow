@@ -429,6 +429,9 @@ async def run_agent(
 
     try:
         await run_manager.wait_for_prior_finalizing(thread_id, run_id)
+        if record.ownership_lost:
+            logger.warning("Run %s was fenced before execution started", run_id)
+            return
         mode = ctx.checkpoint_channel_mode
         inject_checkpoint_mode(config, mode)
         checkpoint_config = {
@@ -480,6 +483,9 @@ async def run_agent(
 
         # 1. Mark running
         await run_manager.set_status(run_id, RunStatus.running)
+        if record.ownership_lost:
+            logger.warning("Run %s lost lease ownership before agent assembly", run_id)
+            return
 
         if event_store is not None:
             workspace_changes_user_id = get_effective_user_id()
@@ -821,12 +827,18 @@ async def run_agent(
         )
 
     finally:
+        if record.ownership_lost:
+            logger.warning(
+                "Skipping durable finalization for run %s because this worker no longer owns its lease",
+                run_id,
+            )
+
         # Persist any subagent step events still buffered (#3779) — including on
         # abort/exception paths, where the stream loop broke before its own flush.
-        if subagent_events is not None:
+        if not record.ownership_lost and subagent_events is not None:
             await subagent_events.flush()
 
-        if event_store is not None and pre_run_workspace_snapshot is not None:
+        if not record.ownership_lost and event_store is not None and pre_run_workspace_snapshot is not None:
             try:
                 await record_workspace_changes(
                     event_store,
@@ -839,7 +851,7 @@ async def run_agent(
                 logger.warning("Failed to record workspace changes for run %s", run_id, exc_info=True)
 
         # Flush any buffered journal events and persist completion data
-        if journal is not None:
+        if not record.ownership_lost and journal is not None:
             try:
                 await journal.flush()
             except Exception:
@@ -852,7 +864,7 @@ async def run_agent(
             except Exception:
                 logger.warning("Failed to persist run completion for %s (non-fatal)", run_id, exc_info=True)
 
-        if checkpointer is not None and record.status == RunStatus.interrupted:
+        if not record.ownership_lost and checkpointer is not None and record.status == RunStatus.interrupted:
             try:
                 await run_manager.wait_for_prior_finalizing(thread_id, run_id)
                 if not await run_manager.has_later_started_run(thread_id, run_id):
@@ -861,7 +873,7 @@ async def run_agent(
                 logger.debug("Failed to generate interrupted title for thread %s (non-fatal)", thread_id)
 
         # Sync title from checkpoint to threads_meta.display_name
-        if checkpointer is not None and thread_store is not None:
+        if not record.ownership_lost and checkpointer is not None and thread_store is not None:
             try:
                 ckpt_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
                 ckpt_tuple = await checkpointer.aget_tuple(ckpt_config)
@@ -875,7 +887,7 @@ async def run_agent(
 
         # Persist run duration to checkpoint metadata so history reads
         # don't need to correlate runs and events.
-        if checkpointer is not None and record.status == RunStatus.success:
+        if not record.ownership_lost and checkpointer is not None and record.status == RunStatus.success:
             try:
                 created = datetime.fromisoformat(record.created_at.replace("Z", "+00:00"))
                 updated = datetime.fromisoformat(record.updated_at.replace("Z", "+00:00"))
@@ -893,14 +905,14 @@ async def run_agent(
                 logger.debug("Failed to persist run duration for thread %s run %s (non-fatal)", thread_id, run_id)
 
         # Update threads_meta status based on run outcome
-        if thread_store is not None:
+        if not record.ownership_lost and thread_store is not None:
             try:
                 final_status = "idle" if record.status == RunStatus.success else record.status.value
                 await thread_store.update_status(thread_id, final_status)
             except Exception:
                 logger.debug("Failed to update thread_meta status for %s (non-fatal)", thread_id)
 
-        if ctx.on_run_completed is not None:
+        if not record.ownership_lost and ctx.on_run_completed is not None:
             try:
                 await ctx.on_run_completed(record)
             except Exception:

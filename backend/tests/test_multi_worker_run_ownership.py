@@ -416,6 +416,110 @@ async def test_heartbeat_renews_pending_run_before_task_is_spawned():
 
 
 @pytest.mark.anyio
+async def test_transient_renewal_exception_before_deadline_keeps_run_alive():
+    """A renewal error is retryable while the last confirmed lease is valid."""
+    config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
+    store = MemoryRunStore()
+    manager = _make_manager(store=store, worker_id="worker-a", run_ownership_config=config)
+    record = await manager.create("thread-1")
+    await manager.set_status(record.run_id, RunStatus.running)
+    record.task = asyncio.create_task(asyncio.sleep(3600))
+    original_update_lease = store.update_lease
+    attempts = 0
+
+    async def fail_once_then_renew(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("temporary database outage")
+        return await original_update_lease(*args, **kwargs)
+
+    store.update_lease = fail_once_then_renew
+    original_expiry = record.lease_expires_at
+
+    try:
+        await manager._renew_leases()
+
+        assert record.abort_event.is_set() is False
+        assert record.task.done() is False
+        assert record.lease_expires_at == original_expiry
+
+        await manager._renew_leases()
+
+        assert attempts == 2
+        assert record.abort_event.is_set() is False
+        assert record.task.done() is False
+        assert record.lease_expires_at is not None
+        assert original_expiry is not None
+        assert record.lease_expires_at > original_expiry
+    finally:
+        record.task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await record.task
+
+
+@pytest.mark.anyio
+async def test_renewal_exception_through_confirmed_expiry_fail_stops_run():
+    """The owner must stop once errors outlive its last confirmed lease."""
+    config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
+    store = MemoryRunStore()
+    manager = _make_manager(store=store, worker_id="worker-a", run_ownership_config=config)
+    record = await manager.create("thread-1")
+    await manager.set_status(record.run_id, RunStatus.running)
+    record.task = asyncio.create_task(asyncio.sleep(3600))
+    attempts = 0
+
+    async def fail_renewal(*_args, **_kwargs):
+        nonlocal attempts
+        attempts += 1
+        raise OSError("database unreachable")
+
+    store.update_lease = fail_renewal
+
+    await manager._renew_leases()
+    assert record.abort_event.is_set() is False
+    assert record.task.done() is False
+
+    expired = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
+    record.lease_expires_at = expired
+    store._runs[record.run_id]["lease_expires_at"] = expired
+
+    await manager._renew_leases()
+    await asyncio.sleep(0)
+
+    assert attempts == 1
+    assert record.ownership_lost is True
+    assert record.abort_event.is_set() is True
+    assert record.task.cancelled()
+
+
+@pytest.mark.anyio
+async def test_hung_renewal_is_bounded_by_confirmed_lease_deadline():
+    """A blocked store call cannot keep execution alive beyond the lease."""
+    config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
+    store = MemoryRunStore()
+    manager = _make_manager(store=store, worker_id="worker-a", run_ownership_config=config)
+    record = await manager.create("thread-1")
+    await manager.set_status(record.run_id, RunStatus.running)
+    record.task = asyncio.create_task(asyncio.sleep(3600))
+    near_expiry = (datetime.now(UTC) + timedelta(milliseconds=50)).isoformat()
+    record.lease_expires_at = near_expiry
+    store._runs[record.run_id]["lease_expires_at"] = near_expiry
+
+    async def hang_renewal(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    store.update_lease = hang_renewal
+
+    await asyncio.wait_for(manager._renew_leases(), timeout=1)
+    await asyncio.sleep(0)
+
+    assert record.ownership_lost is True
+    assert record.abort_event.is_set() is True
+    assert record.task.cancelled()
+
+
+@pytest.mark.anyio
 async def test_heartbeat_skips_runs_not_owned_by_this_worker():
     """Heartbeat must only renew leases for runs owned by this worker."""
     config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
@@ -1329,6 +1433,8 @@ async def test_heartbeat_cancels_task_on_lease_loss():
     # Let the event loop process the cancellation (task.cancel() schedules,
     # doesn't await).
     await asyncio.sleep(0)
+    assert record.ownership_lost is True
+    assert record.abort_event.is_set() is True
     assert record.task.cancelled()
 
 
@@ -1398,6 +1504,60 @@ async def test_cancel_action_rollback_finalizes_to_error_in_store():
     row = await store.get(record.run_id)
     assert row["status"] == "error"
     assert row["error"] == "Rolled back by user"
+
+
+@pytest.mark.anyio
+async def test_peer_reconciliation_fences_late_success_and_completion():
+    """A stale owner cannot overwrite a peer's terminal takeover."""
+    store = MemoryRunStore()
+    config = _lease_config(heartbeat_enabled=True, grace_seconds=0)
+    owner = _make_manager(store=store, worker_id="worker-a", run_ownership_config=config)
+    peer = _make_manager(store=store, worker_id="worker-b", run_ownership_config=config)
+    record = await owner.create("thread-1")
+    await owner.set_status(record.run_id, RunStatus.running)
+
+    expired = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
+    record.lease_expires_at = expired
+    store._runs[record.run_id]["lease_expires_at"] = expired
+    recovered = await peer.reconcile_orphaned_inflight_runs(error="peer takeover")
+
+    assert [recovered_record.run_id for recovered_record in recovered] == [record.run_id]
+    assert (await store.get(record.run_id))["status"] == "error"
+
+    await owner.set_status(record.run_id, RunStatus.success)
+    await owner.update_run_completion(record.run_id, status=record.status.value, total_tokens=1)
+
+    row = await store.get(record.run_id)
+    assert record.ownership_lost is True
+    assert record.status == RunStatus.error
+    assert row["status"] == "error"
+    assert row["error"] == "peer takeover"
+
+
+@pytest.mark.anyio
+async def test_unconfirmed_success_is_fenced_when_heartbeat_is_enabled():
+    """A store outage cannot turn an unconfirmed terminal write into local success."""
+    store = MemoryRunStore()
+    manager = _make_manager(
+        store=store,
+        worker_id="worker-a",
+        run_ownership_config=_lease_config(heartbeat_enabled=True),
+    )
+    record = await manager.create("thread-1")
+    await manager.set_status(record.run_id, RunStatus.running)
+
+    async def fail_status_write(*_args, **_kwargs):
+        raise OSError("database unreachable")
+
+    store.update_status = fail_status_write
+
+    await manager.set_status(record.run_id, RunStatus.success)
+
+    row = await store.get(record.run_id)
+    assert record.ownership_lost is True
+    assert record.status == RunStatus.error
+    assert record.abort_event.is_set() is True
+    assert row["status"] == "running"
 
 
 # ---------------------------------------------------------------------------

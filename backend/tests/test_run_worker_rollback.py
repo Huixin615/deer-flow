@@ -3,7 +3,7 @@ import copy
 from contextlib import suppress
 from types import SimpleNamespace
 from typing import Annotated, Any, NotRequired, TypedDict
-from unittest.mock import AsyncMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from langchain_core.messages import AIMessage, AIMessageChunk, AnyMessage, HumanMessage
@@ -2793,4 +2793,46 @@ async def test_worker_finally_block_swallows_helper_exceptions(monkeypatch):
     # and ``publish_end`` — i.e. the SSE stream is closed cleanly and the row
     # reflects the run outcome.
     assert captured_status.get("status") == ("thread-1", "interrupted")
+    bridge.publish_end.assert_awaited_once_with(record.run_id)
+
+
+@pytest.mark.anyio
+async def test_worker_skips_execution_and_finalization_after_ownership_loss():
+    """A fenced worker closes its stream without starting or finalizing work."""
+    run_manager = RunManager()
+    record = await run_manager.create("thread-lease-lost")
+    record.ownership_lost = True
+    record.abort_event.set()
+    record.status = RunStatus.error
+
+    bridge = SimpleNamespace(
+        publish=AsyncMock(),
+        publish_end=AsyncMock(),
+        cleanup=AsyncMock(),
+    )
+    thread_store = SimpleNamespace(
+        update_display_name=AsyncMock(),
+        update_status=AsyncMock(),
+    )
+    on_run_completed = AsyncMock()
+    agent_factory = MagicMock(side_effect=AssertionError("fenced worker started the agent"))
+
+    await run_agent(
+        bridge,
+        run_manager,
+        record,
+        ctx=RunContext(
+            checkpointer=None,
+            thread_store=thread_store,
+            on_run_completed=on_run_completed,
+        ),
+        agent_factory=agent_factory,
+        graph_input={"messages": []},
+        config={},
+    )
+
+    agent_factory.assert_not_called()
+    thread_store.update_display_name.assert_not_awaited()
+    thread_store.update_status.assert_not_awaited()
+    on_run_completed.assert_not_awaited()
     bridge.publish_end.assert_awaited_once_with(record.run_id)

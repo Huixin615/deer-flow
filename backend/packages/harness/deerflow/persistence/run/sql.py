@@ -315,8 +315,20 @@ class RunRepository(RunStore):
             values["first_human_message"] = first_human_message[:2000]
         if error is not None:
             values["error"] = error
+        allowed_sources = ["pending", "running"]
+        if status not in allowed_sources:
+            allowed_sources.append(status)
+        if status == "error" and "interrupted" not in allowed_sources:
+            allowed_sources.append("interrupted")
         async with self._sf() as session:
-            result = await session.execute(update(RunRow).where(RunRow.run_id == run_id).values(**values))
+            result = await session.execute(
+                update(RunRow)
+                .where(
+                    RunRow.run_id == run_id,
+                    RunRow.status.in_(tuple(allowed_sources)),
+                )
+                .values(**values)
+            )
             await session.commit()
             return result.rowcount != 0
 
