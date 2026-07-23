@@ -137,11 +137,25 @@ sequenceDiagram
 关键组件：
 
 - `runtime/runs/worker.py::run_agent` — 在 `asyncio.Task` 里跑 `agent.astream()`，把每个 chunk 通过 `serialize(chunk, mode=mode)` 转成 JSON，再 `bridge.publish()`。
-- `runtime/stream_bridge` — 抽象 Queue。`publish/subscribe` 解耦生产者和消费者，支持 `Last-Event-ID` 重连、心跳、多订阅者 fan-out。Redis backend 会在每次 `publish()` / `publish_end()` 刷新 retained stream key TTL；启动恢复将 orphan run 标记为 error 后也会发布 `END_SENTINEL`，避免重连的 SSE 客户端只收到心跳。注意：TTL 是 Redis 内存安全网（防止 key 泄漏），不是 subscriber 终止机制——如果 worker 和 gateway 同时挂掉，已连接的 SSE 客户端在 TTL 过期后仍无法收到 END 信号，需要依赖客户端侧超时。完整的跨 pod subscriber 终止需要 worker 存活检测（liveness），当前版本不包含此功能。
+- `runtime/stream_bridge` — 抽象 Queue。`publish/subscribe` 解耦生产者和消费者，支持 `Last-Event-ID` 重连、心跳、多订阅者 fan-out。Memory 和 Redis 都只保留 `queue_maxsize` 条数据事件；游标早于保留水位线时返回 `StreamGap`，不会从当前最早事件静默部分重放。Redis backend 会在每次 `publish()` / `publish_end()` 刷新 retained stream key TTL；启动恢复将 orphan run 标记为 error 后也会发布 `END_SENTINEL`，避免重连的 SSE 客户端只收到心跳。注意：TTL 是 Redis 内存安全网（防止 key 泄漏），不是 subscriber 终止机制——如果 worker 和 gateway 同时挂掉，已连接的 SSE 客户端在 TTL 过期后仍无法收到 END 信号，需要依赖客户端侧超时。完整的跨 pod subscriber 终止需要 worker 存活检测（liveness），当前版本不包含此功能。
 - `app/gateway/services.py::sse_consumer` — 从 bridge 订阅，格式化为 SSE wire 帧。
 - `runtime/serialization.py::serialize` — mode-aware 序列化；`messages` mode 下 `serialize_messages_tuple` 把 `(chunk, metadata)` 转成 `[chunk.model_dump(), metadata]`。
 
 **`StreamBridge` 的存在价值**：当生产者（`run_agent` 任务）和消费者（HTTP 连接）在不同的 asyncio task 里运行时，需要一个可以跨 task 传递事件的中介。Queue 同时还承担断连重连的 buffer 和多订阅者的 fan-out。
+
+### 有界历史与 `gap` 恢复
+
+`Last-Event-ID` 只保证在保留窗口内完整重放，不代表无限历史。有效游标仍在窗口内时，bridge 从该 ID 的下一条事件正常恢复；有效游标已经被 `queue_maxsize` 裁剪，或在线消费者慢到落后水位线时，Gateway 会在任何部分重放之前发送：
+
+```text
+event: gap
+data: {"code":"stream_replay_gap","run_id":"...","requested_event_id":"...","earliest_available_event_id":"...","latest_available_event_id":"...","recovery":"reload_durable_state"}
+
+```
+
+`gap` 帧没有 SSE `id:`，后面也没有正常 `end`；当前订阅随即关闭。它是恢复边界而不是客户端断开，因此不会触发 `on_disconnect=cancel`。客户端必须丢弃不再可信的瞬时状态，重新读取 thread checkpoint 和持久化 run-event/message history，再以 `latest_available_event_id` 为游标跟随新事件。DeerFlow Web UI 自动执行此流程并最多连续恢复五次。
+
+“有效但已淘汰”和 malformed cursor 是不同策略：本契约只要求前者产生 `gap`。Redis 的 malformed ID 仍从 live tail 等待；Memory 对未知 ID 仍采用既有的最早保留事件策略。
 
 ---
 
