@@ -1,0 +1,23 @@
+backend/packages/harness/deerflow/persistence/run/sql.py
+  s_d073282d9d508d::t_941468e965edd5 297-298
+backend/tests/test_multi_worker_run_ownership.py
+  s_d073282d9d508d::t_4c30b9ed74a4ef 565-601
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d9f727a034466e1f81a79fb74173dd5bacaac120",
+  "prompts": {},
+  "sessions": {
+    "s_d073282d9d508d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8fdc-5a67-75c1-9bf1-ead8caf6ac64",
+        "model": "unknown"
+      },
+      "human_author": "Huixin615 <enjoyyourlife615@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
