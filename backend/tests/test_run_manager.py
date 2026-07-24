@@ -66,10 +66,10 @@ class FailingTakeoverRunStore(MemoryRunStore):
 
     def __init__(self) -> None:
         super().__init__()
-        self.takeover_claim_attempts = 0
+        self.takeover_attempts = 0
 
     async def claim_for_takeover(self, run_id, *, grace_seconds, error):
-        self.takeover_claim_attempts += 1
+        self.takeover_attempts += 1
         raise sqlite3.OperationalError("database is locked")
 
 
@@ -302,7 +302,7 @@ async def test_reconcile_orphaned_inflight_runs_skips_live_local_run():
 
 @pytest.mark.anyio
 async def test_reconcile_orphaned_inflight_runs_skips_rows_when_takeover_claim_fails():
-    """Startup recovery must not report a row when the atomic takeover claim fails."""
+    """Startup recovery must not report a row as recovered if the takeover claim failed."""
     store = FailingTakeoverRunStore()
     await store.put("running-run", thread_id="thread-1", status="running", created_at="2026-01-01T00:00:00+00:00")
     manager = RunManager(
@@ -318,7 +318,7 @@ async def test_reconcile_orphaned_inflight_runs_skips_rows_when_takeover_claim_f
     stored = await store.get("running-run")
     assert recovered == []
     assert stored["status"] == "running"
-    assert store.takeover_claim_attempts == 2
+    assert store.takeover_attempts == 2
 
 
 @pytest.mark.anyio

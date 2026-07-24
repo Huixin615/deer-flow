@@ -1144,14 +1144,14 @@ class RunManager:
                     ),
                 )
             except Exception:
-                logger.warning("Failed to claim orphaned run %s during reconciliation", record.run_id, exc_info=True)
+                logger.warning("Failed to claim orphaned run %s for reconciliation", record.run_id, exc_info=True)
                 continue
             if not claimed:
-                # Expected when the owner renewed after the candidate scan,
-                # the run finished, or another reconciler won the claim.
-                logger.debug("Skipped orphaned run %s because its takeover claim no longer matched", record.run_id)
+                logger.info(
+                    "Skipped orphaned run %s recovery because the takeover claim no longer matched",
+                    record.run_id,
+                )
                 continue
-
             record.status = RunStatus.error
             record.error = error
             record.updated_at = now

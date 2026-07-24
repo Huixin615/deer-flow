@@ -261,44 +261,46 @@ async def test_reconciliation_skips_active_lease_runs():
 
 
 @pytest.mark.anyio
-async def test_reconciliation_skips_run_renewed_after_scan():
-    """A successful heartbeat after candidate selection must beat the reaper."""
+async def test_reconciliation_skips_candidate_when_owner_renews_lease_after_scan():
+    """A renewed lease between scan and claim must keep the run active."""
     store = MemoryRunStore()
     grace = 10
-    run_id = "renewed-after-scan"
-    owner_worker_id = "worker-alive"
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 5)).isoformat()
     await store.put(
-        run_id,
+        "race-run",
         thread_id="thread-1",
         status="running",
-        owner_worker_id=owner_worker_id,
+        owner_worker_id="worker-alive",
         lease_expires_at=expired_lease,
         created_at=(datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
     )
+    original_list = store.list_inflight_with_expired_lease
 
-    original_scan = store.list_inflight_with_expired_lease
-
-    async def scan_then_renew(*, before=None, grace_seconds=10):
-        rows = [dict(row) for row in await original_scan(before=before, grace_seconds=grace_seconds)]
-        renewed = await store.update_lease(
-            run_id,
-            owner_worker_id=owner_worker_id,
-            lease_expires_at=(datetime.now(UTC) + timedelta(seconds=60)).isoformat(),
+    async def list_then_owner_renews(*, before=None, grace_seconds=10):
+        rows = [dict(row) for row in await original_list(before=before, grace_seconds=grace_seconds)]
+        renewed_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
+        updated = await store.update_lease(
+            "race-run",
+            owner_worker_id="worker-alive",
+            lease_expires_at=renewed_lease,
         )
-        assert renewed is True
+        assert updated is True
         return rows
 
-    store.list_inflight_with_expired_lease = scan_then_renew
-    manager = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True, grace_seconds=grace))
+    store.list_inflight_with_expired_lease = list_then_owner_renews
+    manager = _make_manager(
+        store=store,
+        run_ownership_config=_lease_config(heartbeat_enabled=True, grace_seconds=grace),
+    )
 
-    recovered = await manager.reconcile_orphaned_inflight_runs(error="orphaned")
+    recovered = await manager.reconcile_orphaned_inflight_runs(
+        error="Gateway restarted before this run reached a durable final state.",
+    )
 
-    row = await store.get(run_id)
     assert recovered == []
-    assert row is not None
-    assert row["status"] == "running"
-    assert datetime.fromisoformat(row["lease_expires_at"]) > datetime.now(UTC)
+    stored = await store.get("race-run")
+    assert stored["status"] == "running"
+    assert datetime.fromisoformat(stored["lease_expires_at"]) > datetime.now(UTC)
 
 
 @pytest.mark.anyio
