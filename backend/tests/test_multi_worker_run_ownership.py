@@ -563,6 +563,43 @@ async def test_hung_renewal_is_bounded_by_confirmed_lease_deadline():
 
 
 @pytest.mark.anyio
+async def test_late_successful_renewal_still_fences_local_run():
+    """A renewal confirmed after the old deadline cannot revive local work."""
+    config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
+    store = MemoryRunStore()
+    manager = _make_manager(store=store, worker_id="worker-a", run_ownership_config=config)
+    record = await manager.create("thread-1")
+    await manager.set_status(record.run_id, RunStatus.running)
+    record.task = asyncio.create_task(asyncio.sleep(3600))
+    near_expiry = (datetime.now(UTC) + timedelta(milliseconds=50)).isoformat()
+    record.lease_expires_at = near_expiry
+    store._runs[record.run_id]["lease_expires_at"] = near_expiry
+    original_update_lease = store.update_lease
+
+    async def renew_after_timeout_cancellation(*args, **kwargs):
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            # Simulate a store operation that commits successfully despite the
+            # caller's deadline cancellation.
+            pass
+        return await original_update_lease(*args, **kwargs)
+
+    store.update_lease = renew_after_timeout_cancellation
+
+    await asyncio.wait_for(manager._renew_leases(), timeout=1)
+    await asyncio.sleep(0)
+
+    row = await store.get(record.run_id)
+    assert row is not None
+    assert row["lease_expires_at"] > near_expiry
+    assert record.lease_expires_at == near_expiry
+    assert record.ownership_lost is True
+    assert record.abort_event.is_set() is True
+    assert record.task.cancelled()
+
+
+@pytest.mark.anyio
 async def test_heartbeat_skips_runs_not_owned_by_this_worker():
     """Heartbeat must only renew leases for runs owned by this worker."""
     config = _lease_config(lease_seconds=30, heartbeat_enabled=True)

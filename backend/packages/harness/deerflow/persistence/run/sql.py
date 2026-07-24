@@ -294,7 +294,8 @@ class RunRepository(RunStore):
     ) -> bool:
         """Update status + token usage + convenience fields on run completion.
 
-        Returns ``False`` when no run row matched the requested ``run_id``.
+        Returns ``False`` when the row is missing or already has a conflicting
+        terminal outcome.
         """
         values: dict[str, Any] = {
             "status": status,
